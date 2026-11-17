@@ -1,0 +1,454 @@
+{
+  "rounds": [
+    {
+      "round": "wave1-r1",
+      "title": "Round wave1-r1 (wave1)",
+      "timestamp": "2026-11-16T17:26:56.501Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 2.93 ms/frame · Calls: 144 · Tris: 1351767 · Errors: 1",
+      "summary": "P0 spiky pyramid horizon & dry-valley puddle glitches; P0 missing eclipse sun & clipped twilight moons + wireframe planet rings; P0 crushed blacks at dawn/twilight & chrome wet halo; P1 corduroy/waffle ripples + salt-and-pepper static; P1 flat water & pool-curb cistern; P1 hamburger-stacked yardangs, hex sci-fi path & windtrap blobs.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r1/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r1/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r1/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r1/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r1/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r2",
+      "title": "Round wave1-r2 (wave1)",
+      "timestamp": "2026-11-16T17:54:21.738Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.49 ms/frame · Calls: 170 · Tris: 1840727 · Errors: 0",
+      "summary": "P0 neon white halo around cistern in noon + cyan shoreline speckles; P0 plastic/chrome specular glare on dry sand (GGX F0=0.04) & washboard ripples + 1px cyan crest line; P0 crushed night shadows & rounded dunes lacking crisp slipfaces; P0 dotted crescent moons, backwards-lit ringed planet missing ring shadow, pinwheel eclipse corona, & flat mouse mare; P0 cartoonish windtrap/thumper palette; P1 flat yardang shelf step & pasted pebbles/slabs.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r2/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r2/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r2/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r2/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r2/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r3",
+      "title": "Round wave1-r3 (wave1)",
+      "timestamp": "2026-11-16T18:14:09.167Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.94 ms/frame · Calls: 173 · Tris: 2633587 · Errors: 0",
+      "summary": "P0 #loading-veil still captured on 01_cistern_dawn; P0 crushed pitch-black foreground dunes at twilight (03) & dim dawn exposure (01); P1 soft dune slipface contrast & subtle LOD lighting jump on right horizon (02); P1 minor Windtrap rib rim catch (04) & Krelln unlit contrast (03).",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r3/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r3/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r3/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r3/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r3/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r4",
+      "title": "Round wave1-r4 (wave1)",
+      "timestamp": "2026-11-16T18:33:13.716Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.87 ms/frame · Calls: 177 · Tris: 1965165 · Errors: 0",
+      "summary": "P0-1 dark-rust apron puddles around rocks/windtrap/thumper & floating stone chips; P0-2 flat paper-cutout horizon bands + repeating periodic ridge scallops; P0-3 contradictory astral crescent phase alignment, dark-hole ringed planet disc vs bright sky, & Arvon dark-limb halo; P0-4 center-left black terrain pit/stain in twilight & dark eclipse shadow slope; P1-1 windtrap diagonal stick arms & cistern right-bank smear; P1-2 twin mushroom mesa clones; P1-3 symmetric 360° starburst eclipse & unbroken pink ring.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r4/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r4/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r4/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r4/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r4/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r5",
+      "title": "Round wave1-r5 (wave1)",
+      "timestamp": "2026-11-17T00:37:02.788Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.88 ms/frame · Calls: 183 · Tris: 2160347 · Errors: 0",
+      "summary": "P0 dashed horizontal sky-leak seam across midground ridge (03, 04); P0 center dune shadow smudge (03, 05); P0 planet dark hemisphere & ring optical contrast (03, 05); P0 flat horizon silhouettes; P0 bowtie/X-starburst eclipse; P1 play-doh dunes/fingerprint ripples, water plasticity/step edge, cloned mesas, dark brick windtrap/peg thumper.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r5/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r5/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r5/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r5/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r5/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r6",
+      "title": "Round wave1-r6 (wave1)",
+      "timestamp": "2026-11-17T01:06:48.714Z",
+      "verdict": "IN_PROGRESS",
+      "metrics": "1280x720 · 0.97 ms/frame · Calls: 192 · Tris: 2847485 · Errors: 0",
+      "summary": "Awaiting Harsh Critic visual inspection.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r6/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r6/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r6/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r6/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r6/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r7",
+      "title": "Round wave1-r7 (wave1)",
+      "timestamp": "2026-11-17T01:36:17.911Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.66 ms/frame · Calls: 196 · Tris: 2783969 · Errors: 0",
+      "summary": "P0s: 01 square-grid specular runway & glossy wet bank; 04/01 shoreline halo & smeared ripples; 05 360-deg dandelion-puff corona; 04 mesa tan smudge, faceted shards, cushion flagstones.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r7/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r7/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r7/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r7/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r7/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r8",
+      "title": "Round wave1-r8 (wave1)",
+      "timestamp": "2026-11-17T01:51:45.769Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.36 ms/frame · Calls: 196 · Tris: 3168145 · Errors: 0",
+      "summary": "P0s: 01/04 cottony airbrushed water rim & weak ripples; 05 4-point star corona & black lunar disc in front of sky; 04 chalky rock cap topCenter color & shadowless thin flagstones.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r8/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r8/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r8/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r8/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r8/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r9",
+      "title": "Round wave1-r9 (wave1)",
+      "timestamp": "2026-11-17T05:29:24.669Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.2 ms/frame · Calls: 195 · Tris: 3199729 · Errors: 0",
+      "summary": "P0s: 04/01 water black reflection stipple dots; 01 white milky rim gasket & blurry shore trench; 05 straight spoke corona, oval outer halo, bright 3D grey sphere Krelln. P1s: flagstone undercuts/crumbs, flat far-left horizon & corduroy foreground ripples, Windtrap facets.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r9/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r9/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r9/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r9/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r9/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r10",
+      "title": "Round wave1-r10 (wave1)",
+      "timestamp": "2026-11-17T05:46:18.146Z",
+      "verdict": "IN_PROGRESS",
+      "metrics": "1280x720 · 0.4 ms/frame · Calls: 197 · Tris: 3218369 · Errors: 0",
+      "summary": "Awaiting Harsh Visual Critic verdict on wave1-r10.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r10/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r10/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r10/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r10/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r10/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r11",
+      "title": "Round wave1-r11 (wave1)",
+      "timestamp": "2026-11-17T06:05:05.958Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.46 ms/frame · Calls: 199 · Tris: 3028825 · Errors: 0",
+      "summary": "Self-audit regressions caught: scalloped mid-Erg horizon ridges in 02/03/04/05, bright noon white shoreline specular border in 04, tight dark eclipse umbra bruise ring around corona in 05.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r11/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r11/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r11/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r11/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r11/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r12",
+      "title": "Round wave1-r12 (wave1)",
+      "timestamp": "2026-11-17T06:08:00.008Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.83 ms/frame · Calls: 199 · Tris: 3028825 · Errors: 0",
+      "summary": "P0s: 01/04 dark z=-45m horizon band behind Windtrap & right bright facet crease; 05 straight radial corona spokes, compact circular fuzz & 2-3px white Krelln rim; 02/03/05 featureless dark pillow mound foreground dune lacking S-curve brink lighting; 01/04 smooth elliptical mud collar & choppy/milky water edge; 04 oatmeal square flagstones & cantilevered upper-slope steps.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r12/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r12/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r12/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r12/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r12/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r13",
+      "title": "Round wave1-r13 (wave1)",
+      "timestamp": "2026-11-17T06:26:27.284Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.41 ms/frame · Calls: 211 · Tris: 3002977 · Errors: 0",
+      "summary": "Self-audit: 01..04 & planet/dunes look extraordinary; refined 05_eclipse_vista.png corona to replace the 4 pinched neon ribbon noodles and polar comb spikes with gossamer curved dipole helmet veils.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r13/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r13/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r13/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r13/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r13/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r14",
+      "title": "Round wave1-r14 (wave1)",
+      "timestamp": "2026-11-17T06:28:23.055Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.69 ms/frame · Calls: 211 · Tris: 3002977 · Errors: 0",
+      "summary": "4 P0s: (1) cistern shoreline stipple/outline in 04 & dawn olive flatness/oval edge in 01; (2) inverted sun lighting on Windtrap/Yardangs vs cast shadows & dunes; (3) midground ridge triangle zipper sawtooths & pinched horizon peak profiles; (4) Milky Way cellular soap-foam bubbles & night-side discs darker than twilight sky in 03. Plus 3 P1s (05 corona filaments/polar bristles, flagstones, Yardang upper undercuts).",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r14/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r14/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r14/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r14/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r14/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "wave1-r15",
+      "title": "Round wave1-r15 (wave1)",
+      "timestamp": "2026-11-17T06:51:52.657Z",
+      "verdict": "IN_PROGRESS",
+      "metrics": "1280x720 · 0.61 ms/frame · Calls: 209 · Tris: 3157777 · Errors: 0",
+      "summary": "Awaiting Harsh Critic visual inspection.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/wave1-r15/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/wave1-r15/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/wave1-r15/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/wave1-r15/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/wave1-r15/05_eclipse_vista.png"
+        }
+      ]
+    }
+  ]
+}

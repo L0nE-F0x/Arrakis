@@ -1,0 +1,403 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { getGroundHeight, WATER_LEVEL } from './terrainMath.js';
+
+const DIRECTOR_DURATION = 42.0; // seconds per full cinematic loop
+const GROUND_CLEARANCE = 0.35;
+
+// Scratch vectors for zero-allocation per-frame updates
+const _camPos = new THREE.Vector3();
+const _targetPos = new THREE.Vector3();
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _move = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+
+function safeY(x, z, y) {
+  const floor = Math.max(getGroundHeight(x, z), WATER_LEVEL);
+  return Math.max(y, floor + GROUND_CLEARANCE);
+}
+
+function buildPresets() {
+  const floraCamY = getGroundHeight(5.3, 5.4) + 0.78;
+  const floraTgtY = getGroundHeight(4.2, 2.6) + 0.55;
+  const canopyCamY = getGroundHeight(5.8, -9.2) + 1.1;
+  const muaddibCamY = getGroundHeight(4.1, 11.2) + 0.75;
+  const muaddibTgtY = getGroundHeight(3.2, 8.8) + 0.35;
+
+  return {
+    cistern: {
+      position: new THREE.Vector3(0.4, safeY(0.4, 15.8, 2.0), 15.8),
+      target: new THREE.Vector3(0.0, 1.5, -18.0),
+      caption: { kicker: 'SIETCH DEW BASIN', title: 'First Light Over the Qanat Cistern' }
+    },
+    flora: {
+      position: new THREE.Vector3(5.3, safeY(5.3, 5.4, floraCamY), 5.4),
+      target: new THREE.Vector3(4.2, floraTgtY, 2.6),
+      caption: { kicker: 'QANAT RIPARIAN EDGE', title: 'Inkvine, Agave & Condensation Flora' }
+    },
+    canopy: {
+      position: new THREE.Vector3(5.8, safeY(5.8, -9.2, canopyCamY), -9.2),
+      target: new THREE.Vector3(3.2, 11.0, -18.0),
+      caption: { kicker: 'TAMARISK CANOPY', title: 'Twin Moons & Canopus Through Desert Crown' }
+    },
+    ridge: {
+      position: new THREE.Vector3(-1.0, safeY(-1.0, -22.0, 7.2), -22.0),
+      target: new THREE.Vector3(4.0, 3.2, -135.0),
+      caption: { kicker: 'THE GREAT ERG', title: 'Star Dune Crests & Endless Horizon' }
+    },
+    horizon: {
+      position: new THREE.Vector3(0.5, safeY(0.5, -16.0, 6.2), -16.0),
+      target: new THREE.Vector3(0.0, 15.5, -260.0),
+      caption: { kicker: 'ARRAKIS SKYLINE', title: 'Canopus, Twin Moons & Sister Planet' }
+    },
+    yardang: {
+      position: new THREE.Vector3(0.0, safeY(0.0, 14.0, 3.4), 14.0),
+      target: new THREE.Vector3(-15.0, 5.2, -8.0),
+      caption: { kicker: 'SANDSTONE YARDANGS', title: 'Wind-Carved Strata & Fremen Windtrap Path' }
+    },
+    muaddib: {
+      position: new THREE.Vector3(4.1, safeY(4.1, 11.2, muaddibCamY), 11.2),
+      target: new THREE.Vector3(3.2, muaddibTgtY, 8.8),
+      caption: { kicker: 'DESERT ECOLOGY', title: "Muad'Dib Foraging Beside Moisture Flora" }
+    },
+    worm: {
+      position: new THREE.Vector3(-2.0, safeY(-2.0, -24.0, 9.5), -24.0),
+      target: new THREE.Vector3(10.0, 8.0, -115.0),
+      caption: { kicker: 'SHAI-HULUD', title: 'Deep-Erg Maker Breach & Sand Plume' }
+    },
+    spice: {
+      position: new THREE.Vector3(-8.0, safeY(-8.0, -28.0, 6.8), -28.0),
+      target: new THREE.Vector3(-22.0, 4.0, -72.0),
+      caption: { kicker: 'MÉLANGE VEIN', title: 'Pre-Spice Blow & Dust Vortex Basin' }
+    }
+  };
+}
+
+function buildDirectorCurves() {
+  const waypoints = [
+    // Leg 1: SIETCH DEW BASIN
+    {
+      pos: [0.4, safeY(0.4, 15.8, 2.0), 15.8],
+      tgt: [0.0, 1.5, -18.0]
+    },
+    {
+      pos: [2.6, safeY(2.6, 13.4, getGroundHeight(2.6, 13.4) + 0.72), 13.4],
+      tgt: [1.4, 1.35, -7.5]
+    },
+    // Leg 2: WINDTRAP QANAT PATH (low shoreline glide y ~ terrain + 0.9m)
+    {
+      pos: [4.5, safeY(4.5, 10.5, getGroundHeight(4.5, 10.5) + 0.9), 10.5],
+      tgt: [2.3, getGroundHeight(2.3, 4.8) + 0.55, 4.8]
+    },
+    {
+      pos: [6.2, safeY(6.2, 2.5, getGroundHeight(6.2, 2.5) + 0.9), 2.5],
+      tgt: [3.2, getGroundHeight(3.2, -1.6) + 0.6, -1.6]
+    },
+    {
+      pos: [4.6, safeY(4.6, -6.5, getGroundHeight(4.6, -6.5) + 0.9), -6.5],
+      tgt: [1.5, 2.0, -15.5]
+    },
+    // Leg 3: ARRAKIS SKYLINE (sweeps slightly upward looking skyward)
+    {
+      pos: [4.8, safeY(4.8, -11.5, 3.6), -11.5],
+      tgt: [-3.0, 14.0, -36.0]
+    },
+    {
+      pos: [1.8, safeY(1.8, -18.5, 5.1), -18.5],
+      tgt: [-1.4, 9.2, -78.0]
+    },
+    // Leg 4: THE GREAT ERG (crests ridge overlooking endless dunes)
+    {
+      pos: [-1.2, safeY(-1.2, -24.5, 6.2), -24.5],
+      tgt: [0.0, 3.5, -135.0]
+    },
+    // Soft aerial glide back over western cistern rim
+    {
+      pos: [-3.6, safeY(-3.6, -9.0, 4.6), -9.0],
+      tgt: [0.0, 1.8, -4.0]
+    },
+    {
+      pos: [-2.1, safeY(-2.1, 8.5, 2.9), 8.5],
+      tgt: [0.2, 1.5, -12.0]
+    }
+  ];
+
+  const posCurve = new THREE.CatmullRomCurve3(
+    waypoints.map(w => new THREE.Vector3(...w.pos)),
+    true,
+    'catmullrom',
+    0.5
+  );
+  const tgtCurve = new THREE.CatmullRomCurve3(
+    waypoints.map(w => new THREE.Vector3(...w.tgt)),
+    true,
+    'catmullrom',
+    0.5
+  );
+
+  return { posCurve, tgtCurve };
+}
+
+export function createCameraController(camera, domElement, worldState) {
+  const presets = buildPresets();
+  const { posCurve, tgtCurve } = buildDirectorCurves();
+
+  const controls = new OrbitControls(camera, domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.065;
+  controls.rotateSpeed = 0.72;
+  controls.panSpeed = 0.75;
+  controls.zoomSpeed = 0.9;
+  controls.minDistance = 0.8;
+  controls.maxDistance = 420;
+  controls.maxPolarAngle = Math.PI * 0.94;
+  controls.minPolarAngle = 0.06;
+
+  let mode = worldState.cameraMode || 'director';
+  let directorElapsed = 0;
+  let directorParamT = 0;
+
+  // Smooth preset transition state
+  const transition = {
+    active: false,
+    progress: 1,
+    duration: 0.9,
+    fromPos: new THREE.Vector3(),
+    fromTarget: new THREE.Vector3(),
+    toPos: new THREE.Vector3(),
+    toTarget: new THREE.Vector3()
+  };
+
+  // Free-camera WASD / Arrow key state
+  const keys = new Set();
+  const onKeyDown = e => {
+    const tag = e.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (
+      e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD' ||
+      e.code === 'KeyQ' || e.code === 'KeyE' ||
+      e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight'
+    ) {
+      keys.add(e.code);
+    }
+  };
+  const onKeyUp = e => keys.delete(e.code);
+  const onBlur = () => keys.clear();
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', onBlur);
+
+  // If user interacts with OrbitControls during a transition, hand over cleanly
+  const onControlStart = () => {
+    transition.active = false;
+  };
+  controls.addEventListener('start', onControlStart);
+
+  function clampCameraAboveTerrain() {
+    camera.position.x = THREE.MathUtils.clamp(camera.position.x, -175, 175);
+    camera.position.z = THREE.MathUtils.clamp(camera.position.z, -210, 85);
+    const minY = safeY(camera.position.x, camera.position.z, -Infinity);
+    if (camera.position.y < minY) {
+      camera.position.y = minY;
+    }
+    controls.target.y = Math.max(controls.target.y, -4.0);
+  }
+
+  function evalDirectorAt(phaseSec, outPos, outTgt) {
+    const u = ((phaseSec / DIRECTOR_DURATION) % 1 + 1) % 1;
+    const t = posCurve.getUtoTmapping(u, u);
+    directorParamT = t;
+    posCurve.getPoint(t, outPos);
+    tgtCurve.getPoint(t, outTgt);
+    const minY = safeY(outPos.x, outPos.z, -Infinity);
+    if (outPos.y < minY) outPos.y = minY;
+  }
+
+  function setPreset(name, instant = false) {
+    const validName = name === 'director' || name === 'free' || presets[name] ? name : 'director';
+    const prevMode = mode;
+    mode = validName;
+    worldState.cameraMode = validName;
+
+    if (validName === 'director') {
+      controls.enabled = false;
+      if (instant) {
+        directorElapsed = 0;
+        evalDirectorAt(0, _camPos, _targetPos);
+        camera.position.copy(_camPos);
+        controls.target.copy(_targetPos);
+        camera.lookAt(controls.target);
+        transition.active = false;
+      } else {
+        // Blend smoothly into current director pose
+        evalDirectorAt(directorElapsed, _camPos, _targetPos);
+        transition.active = true;
+        transition.progress = 0;
+        transition.fromPos.copy(camera.position);
+        transition.fromTarget.copy(controls.target);
+        transition.toPos.copy(_camPos);
+        transition.toTarget.copy(_targetPos);
+      }
+      return;
+    }
+
+    controls.enabled = true;
+
+    if (validName === 'free') {
+      transition.active = false;
+      if (instant && prevMode === 'director') {
+        // Place free orbit at cistern overlook when snapped directly
+        const p = presets.cistern;
+        camera.position.copy(p.position);
+        controls.target.copy(p.target);
+      } else {
+        // Preserve current camera view direction seamlessly when switching to Free Orbit
+        camera.getWorldDirection(_forward);
+        controls.target.copy(camera.position).addScaledVector(_forward, 12.0);
+      }
+      clampCameraAboveTerrain();
+      camera.lookAt(controls.target);
+      controls.update();
+      return;
+    }
+
+    const preset = presets[validName];
+    // Clear any residual OrbitControls damping inertia before moving to a preset
+    controls.enableDamping = false;
+    controls.update();
+    controls.enableDamping = true;
+
+    if (instant) {
+      transition.active = false;
+      camera.position.copy(preset.position);
+      controls.target.copy(preset.target);
+      clampCameraAboveTerrain();
+      camera.lookAt(controls.target);
+      controls.update();
+    } else {
+      transition.active = true;
+      transition.progress = 0;
+      transition.fromPos.copy(camera.position);
+      transition.fromTarget.copy(controls.target);
+      transition.toPos.copy(preset.position);
+      transition.toTarget.copy(preset.target);
+    }
+  }
+
+  function update(dt) {
+    const step = Math.min(Math.max(dt, 0), 0.1);
+
+    if (mode === 'director') {
+      if (!worldState.paused) {
+        directorElapsed = (directorElapsed + step) % DIRECTOR_DURATION;
+      }
+      evalDirectorAt(directorElapsed, _camPos, _targetPos);
+
+      if (transition.active) {
+        transition.progress = Math.min(1, transition.progress + step / transition.duration);
+        const s = transition.progress * transition.progress * (3 - 2 * transition.progress);
+        camera.position.lerpVectors(transition.fromPos, _camPos, s);
+        controls.target.lerpVectors(transition.fromTarget, _targetPos, s);
+        if (transition.progress >= 1) transition.active = false;
+      } else {
+        camera.position.copy(_camPos);
+        controls.target.copy(_targetPos);
+      }
+
+      // Ultra-subtle desert wind / sandworm tremor feel on open Erg legs
+      if (worldState.worm.tremor > 0.35) {
+        const rumble = (worldState.worm.tremor - 0.35) * 0.018;
+        camera.position.x += Math.sin(worldState.elapsed * 29.0) * rumble;
+        camera.position.y += Math.cos(worldState.elapsed * 37.0) * rumble * 0.6;
+      }
+
+      clampCameraAboveTerrain();
+      camera.lookAt(controls.target);
+      return;
+    }
+
+    // Transition ease for named presets
+    if (transition.active) {
+      transition.progress = Math.min(1, transition.progress + step / transition.duration);
+      const s = transition.progress * transition.progress * (3 - 2 * transition.progress);
+      camera.position.lerpVectors(transition.fromPos, transition.toPos, s);
+      controls.target.lerpVectors(transition.fromTarget, transition.toTarget, s);
+      clampCameraAboveTerrain();
+      camera.lookAt(controls.target);
+      if (transition.progress >= 1) {
+        transition.active = false;
+        controls.enableDamping = false;
+        controls.update();
+        controls.enableDamping = true;
+      }
+      return;
+    }
+
+    // Free-cam WASD / Arrow glide
+    if (mode === 'free' && keys.size > 0 && step > 0) {
+      camera.getWorldDirection(_forward);
+      _forward.y = 0;
+      if (_forward.lengthSq() < 1e-6) _forward.set(0, 0, -1);
+      _forward.normalize();
+      _right.crossVectors(_forward, _up).normalize();
+
+      _move.set(0, 0, 0);
+      if (keys.has('KeyW') || keys.has('ArrowUp')) _move.add(_forward);
+      if (keys.has('KeyS') || keys.has('ArrowDown')) _move.sub(_forward);
+      if (keys.has('KeyD') || keys.has('ArrowRight')) _move.add(_right);
+      if (keys.has('KeyA') || keys.has('ArrowLeft')) _move.sub(_right);
+      if (keys.has('KeyE')) _move.y += 0.85;
+      if (keys.has('KeyQ')) _move.y -= 0.85;
+
+      if (_move.lengthSq() > 0) {
+        const speed = 11.5;
+        _move.normalize().multiplyScalar(speed * step);
+        camera.position.add(_move);
+        controls.target.add(_move);
+      }
+    }
+
+    controls.update();
+    clampCameraAboveTerrain();
+  }
+
+  function getCaption() {
+    if (mode === 'director') {
+      if (directorParamT < 0.20 || directorParamT >= 0.88) {
+        return { kicker: 'SIETCH DEW BASIN', title: 'First Light Over the Qanat Cistern' };
+      }
+      if (directorParamT < 0.48) {
+        return { kicker: 'WINDTRAP QANAT PATH', title: 'Shoreline Flora & Condensation Runnels' };
+      }
+      if (directorParamT < 0.68) {
+        return { kicker: 'ARRAKIS SKYLINE', title: 'Canopus, Twin Moons & Sandstone Overhangs' };
+      }
+      return { kicker: 'THE GREAT ERG', title: 'Endless Star Dunes & Shai-Hulud Territory' };
+    }
+
+    if (mode === 'free') {
+      return { kicker: 'FREE ORBIT', title: 'Arrakis Reconnaissance · Drag & WASD Glide' };
+    }
+
+    return presets[mode]?.caption || presets.cistern.caption;
+  }
+
+  // Initialize cleanly into the initial camera mode
+  setPreset(mode, true);
+
+  return {
+    setPreset,
+    update,
+    getCaption,
+    controls,
+    dispose() {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      controls.removeEventListener('start', onControlStart);
+      controls.dispose();
+    }
+  };
+}

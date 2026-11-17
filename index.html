@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARRAKIS — Procedural World &amp; Atmospheric Simulation</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23160f0a' stroke='%23e6a85c' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ffd089'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <div id="canvas-root"></div>
+
+    <div id="loading-veil" class="loading-veil">
+      <div class="veil-emblem">
+        <div class="veil-ring"></div>
+        <div class="veil-moon-a"></div>
+        <div class="veil-moon-b"></div>
+      </div>
+      <p class="veil-title">ARRAKIS</p>
+      <p class="veil-sub" id="loading-status">Synthesizing Erg Geometry &amp; Shaders…</p>
+    </div>
+
+    <div id="hud-root" class="hud-root">
+      <header class="hud-top">
+        <div class="brand-cluster">
+          <div class="brand-sigil" aria-hidden="true"></div>
+          <div>
+            <h1>ARRAKIS <span class="brand-tag">CANOPUS III</span></h1>
+            <p class="hud-meta" id="hud-telemetry">06:18 · Calm Clear · Wind 4.2 m/s · 60 FPS</p>
+          </div>
+        </div>
+
+        <div class="top-actions">
+          <button id="btn-director" class="pill-btn active" title="Toggle Choreographed Director Shot">
+            <span class="dot"></span> Director Cut
+          </button>
+          <button id="btn-audio" class="pill-btn" title="Toggle Procedural Desert Soundscape">
+            Soundscape
+          </button>
+          <button id="btn-thumper" class="pill-btn accent" title="Plant & Activate Fremen Thumper">
+            Strike Thumper
+          </button>
+          <a href="/gauntlet.html" target="_blank" class="pill-btn subtle" title="Open Gauntlet Loop Progress Log">
+            Gauntlet Log
+          </a>
+          <button id="btn-hide-hud" class="pill-btn icon" title="Hide UI [H]">H</button>
+        </div>
+      </header>
+
+      <aside class="hud-deck" id="hud-deck">
+        <section class="deck-section">
+          <div class="section-head">
+            <span>ASTRAL CLOCK</span>
+            <span id="readout-time" class="mono-val">06:18</span>
+          </div>
+          <input id="slider-tod" type="range" min="0" max="24" step="0.02" value="6.30" />
+          <div class="chip-grid" id="preset-tod">
+            <button data-tod="5.55">First Dawn</button>
+            <button data-tod="12.2">Blistering Noon</button>
+            <button data-tod="17.65">Saffron Hour</button>
+            <button data-tod="18.75">Blood Dusk</button>
+            <button data-tod="23.4">Twin Moons</button>
+            <button data-tod="11.4" data-eclipse="1">Canopus Eclipse</button>
+          </div>
+          <div class="toggle-row">
+            <label><input id="chk-auto-time" type="checkbox" checked /> Orbital Drift</label>
+            <label><input id="chk-auto-weather" type="checkbox" checked /> Living Weather</label>
+          </div>
+        </section>
+
+        <section class="deck-section">
+          <div class="section-head">
+            <span>WEATHER PATTERNS</span>
+            <span id="readout-weather" class="mono-val">Clear</span>
+          </div>
+          <div class="chip-grid" id="preset-weather">
+            <button data-weather="calm" class="active">Calm Oasis</button>
+            <button data-weather="mirage">Heat Mirage</button>
+            <button data-weather="saltation">Dune Drift</button>
+            <button data-weather="dustDevil">Dust Devils</button>
+            <button data-weather="spiceBlow">Spice Blow</button>
+            <button data-weather="coriolisStorm">Coriolis Storm</button>
+          </div>
+          <div class="slider-pair">
+            <label>Wind <span id="readout-wind" class="mono-val">0.45</span></label>
+            <input id="slider-wind" type="range" min="0" max="1.6" step="0.02" value="0.45" />
+          </div>
+        </section>
+
+        <section class="deck-section">
+          <div class="section-head">
+            <span>CAMERA LENS</span>
+            <span id="readout-cam" class="mono-val">Director</span>
+          </div>
+          <div class="chip-grid" id="preset-camera">
+            <button data-cam="director" class="active">Director Cut</button>
+            <button data-cam="free">Free Orbit</button>
+            <button data-cam="flora">Macro Flora</button>
+            <button data-cam="cistern">Dew Cistern</button>
+            <button data-cam="muaddib">Muad'Dib</button>
+            <button data-cam="ridge">Erg &amp; Worm</button>
+          </div>
+          <p class="hint-line">Drag to orbit · Scroll to zoom · WASD glide · [H] clean view</p>
+        </section>
+      </aside>
+
+      <div id="caption-banner" class="caption-banner">
+        <span class="cap-kicker" id="cap-kicker">SIETCH DEW BASIN</span>
+        <span class="cap-title" id="cap-title">First Light Over the Qanat Cistern</span>
+      </div>
+
+      <button id="btn-show-hud" class="hud-restore" title="Restore Interface [H]">Show HUD [H]</button>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
