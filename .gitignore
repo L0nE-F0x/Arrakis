@@ -3,4 +3,8 @@ dist/
 .DS_Store
 *.log
 .vite/
-public/gauntlet/rounds/
+public/gauntlet/rounds/*
+!public/gauntlet/rounds/wave1-r15/
+!public/gauntlet/rounds/carbon-w1-r4/
+!public/gauntlet/rounds/carbon-w2-r4/
+!public/gauntlet/rounds/carbon-w3-r5/

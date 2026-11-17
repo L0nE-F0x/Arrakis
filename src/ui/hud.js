@@ -3,6 +3,8 @@ const CAM_LABELS = {
   free: 'Free Orbit',
   cistern: 'Dew Cistern',
   flora: 'Macro Flora',
+  nightBloom: 'Night Blooms',
+  nightCistern: 'Night Mirror',
   canopy: 'Canopy Sky',
   ridge: 'Erg & Worm',
   horizon: 'Horizon',
@@ -116,14 +118,14 @@ export function initHud(worldState, cameraController, callbacks = {}) {
       }
     }
 
-    const windStr = worldState.windSpeed.toFixed(2);
-    if (force || windStr !== lastWind) {
-      lastWind = windStr;
-      if (readoutWind) readoutWind.textContent = windStr;
+    const windMsStr = `${(worldState.windSpeed * 10).toFixed(1)} m/s`;
+    if (force || windMsStr !== lastWind) {
+      lastWind = windMsStr;
+      if (readoutWind) readoutWind.textContent = windMsStr;
     }
-    if (sliderWind && (!draggingWind || force)) {
-      const baseWindStr = worldState.baseWind.toFixed(2);
-      if (sliderWind.value !== baseWindStr) sliderWind.value = baseWindStr;
+    if (sliderWind && !draggingWind) {
+      const effWindStr = Math.min(1.0, worldState.windSpeed).toFixed(2);
+      if (sliderWind.value !== effWindStr) sliderWind.value = effWindStr;
     }
 
     const camMode = worldState.cameraMode;
@@ -218,6 +220,11 @@ export function initHud(worldState, cameraController, callbacks = {}) {
   for (const btn of camButtons) {
     bind(btn, 'click', () => {
       const cam = btn.dataset.cam;
+      if (cam === 'worm' && worldState.worm.phase !== 'breach') {
+        worldState.triggerBreach(12, -106, 0.12);
+      } else if (cam === 'spice' && worldState.targetWeather !== 'spiceBlow') {
+        worldState.setWeather('spiceBlow');
+      }
       cameraController.setPreset(cam, false);
       syncFromState(true);
     });

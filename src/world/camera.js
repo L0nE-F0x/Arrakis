@@ -19,67 +19,85 @@ function safeY(x, z, y) {
 }
 
 function buildPresets() {
-  const floraCamY = getGroundHeight(5.3, 5.4) + 0.78;
-  const floraTgtY = getGroundHeight(4.2, 2.6) + 0.55;
-  const canopyCamY = getGroundHeight(5.8, -9.2) + 1.1;
-  const muaddibCamY = getGroundHeight(4.1, 11.2) + 0.75;
-  const muaddibTgtY = getGroundHeight(3.2, 8.8) + 0.35;
+  const floraCamY = getGroundHeight(6.75, 6.45) + 0.84;
+  const floraTgtY = getGroundHeight(3.85, 3.95) + 0.54;
+  const nightBloomCamY = getGroundHeight(3.35, 12.35) + 0.78;
+  const nightCisternCamY = getGroundHeight(0.25, 13.4) + 0.88;
+  const canopyCamY = getGroundHeight(5.15, -9.8) + 0.92;
+  const bloomingRidgeCamY = getGroundHeight(1.6, -21.2) + 1.18;
+  const muaddibCamY = getGroundHeight(3.86, 10.06) + 0.36;
+  const muaddibTgtY = getGroundHeight(3.16, 8.92) + 0.14;
 
   return {
     cistern: {
-      position: new THREE.Vector3(0.4, safeY(0.4, 15.8, 2.0), 15.8),
-      target: new THREE.Vector3(0.0, 1.5, -18.0),
+      position: new THREE.Vector3(0.55, safeY(0.55, 13.6, 1.78), 13.6),
+      target: new THREE.Vector3(0.2, 1.85, -18.0),
       caption: { kicker: 'SIETCH DEW BASIN', title: 'First Light Over the Qanat Cistern' }
     },
     flora: {
-      position: new THREE.Vector3(5.3, safeY(5.3, 5.4, floraCamY), 5.4),
-      target: new THREE.Vector3(4.2, floraTgtY, 2.6),
+      position: new THREE.Vector3(6.75, safeY(6.75, 6.45, floraCamY), 6.45),
+      target: new THREE.Vector3(3.85, floraTgtY, 3.95),
       caption: { kicker: 'QANAT RIPARIAN EDGE', title: 'Inkvine, Agave & Condensation Flora' }
     },
+    nightBloom: {
+      position: new THREE.Vector3(3.35, safeY(3.35, 12.35, nightBloomCamY), 12.35),
+      target: new THREE.Vector3(-0.35, 4.6, -24.0),
+      caption: { kicker: 'NOCTURNAL OASIS', title: 'Twin-Moon Reflections & Bioluminescent Blooms' }
+    },
+    nightCistern: {
+      position: new THREE.Vector3(0.25, safeY(0.25, 13.4, nightCisternCamY), 13.4),
+      target: new THREE.Vector3(0.4, 6.8, -36.0),
+      caption: { kicker: 'ASTRAL MIRROR', title: 'Twin Moons & Starlight Reflected in the Cistern' }
+    },
     canopy: {
-      position: new THREE.Vector3(5.8, safeY(5.8, -9.2, canopyCamY), -9.2),
-      target: new THREE.Vector3(3.2, 11.0, -18.0),
-      caption: { kicker: 'TAMARISK CANOPY', title: 'Twin Moons & Canopus Through Desert Crown' }
+      position: new THREE.Vector3(5.15, safeY(5.15, -9.8, canopyCamY), -9.8),
+      target: new THREE.Vector3(2.4, 15.8, -28.0),
+      caption: { kicker: 'TAMARISK CANOPY', title: 'Twin Moons & Sister Planet Through Desert Crown' }
+    },
+    bloomingRidge: {
+      position: new THREE.Vector3(1.6, safeY(1.6, -21.2, bloomingRidgeCamY), -21.2),
+      target: new THREE.Vector3(-1.5, 6.2, -135.0),
+      caption: { kicker: 'OASIS MARGIN', title: 'Great Erg Beyond the Blooming Ridge' }
     },
     ridge: {
-      position: new THREE.Vector3(-1.0, safeY(-1.0, -22.0, 7.2), -22.0),
-      target: new THREE.Vector3(4.0, 3.2, -135.0),
+      position: new THREE.Vector3(4.2, safeY(4.2, -33.5, 8.2), -33.5),
+      target: new THREE.Vector3(-8.5, 6.8, -142.0),
       caption: { kicker: 'THE GREAT ERG', title: 'Star Dune Crests & Endless Horizon' }
     },
     horizon: {
-      position: new THREE.Vector3(0.5, safeY(0.5, -16.0, 6.2), -16.0),
-      target: new THREE.Vector3(0.0, 15.5, -260.0),
+      position: new THREE.Vector3(-3.2, safeY(-3.2, -37.5, 8.2), -37.5),
+      target: new THREE.Vector3(0.0, 29.0, -260.0),
       caption: { kicker: 'ARRAKIS SKYLINE', title: 'Canopus, Twin Moons & Sister Planet' }
     },
     yardang: {
-      position: new THREE.Vector3(0.0, safeY(0.0, 14.0, 3.4), 14.0),
-      target: new THREE.Vector3(-15.0, 5.2, -8.0),
-      caption: { kicker: 'SANDSTONE YARDANGS', title: 'Wind-Carved Strata & Fremen Windtrap Path' }
+      position: new THREE.Vector3(1.8, safeY(1.8, 13.2, 3.15), 13.2),
+      target: new THREE.Vector3(-16.2, 4.8, -8.5),
+      caption: { kicker: 'SANDSTONE YARDANGS', title: 'Wind-Carved Arch & Fremen Badgir Spire' }
     },
     muaddib: {
-      position: new THREE.Vector3(4.1, safeY(4.1, 11.2, muaddibCamY), 11.2),
-      target: new THREE.Vector3(3.2, muaddibTgtY, 8.8),
+      position: new THREE.Vector3(3.86, safeY(3.86, 10.06, muaddibCamY), 10.06),
+      target: new THREE.Vector3(3.16, muaddibTgtY, 8.92),
       caption: { kicker: 'DESERT ECOLOGY', title: "Muad'Dib Foraging Beside Moisture Flora" }
     },
     worm: {
       position: new THREE.Vector3(-2.0, safeY(-2.0, -24.0, 9.5), -24.0),
-      target: new THREE.Vector3(10.0, 8.0, -115.0),
-      caption: { kicker: 'SHAI-HULUD', title: 'Deep-Erg Maker Breach & Sand Plume' }
+      target: new THREE.Vector3(14.0, 13.5, -108.0),
+      caption: { kicker: 'SHAI-HULUD', title: 'Deep-Erg Elder Maker Breach & Sand Plume' }
     },
     spice: {
-      position: new THREE.Vector3(-8.0, safeY(-8.0, -28.0, 6.8), -28.0),
-      target: new THREE.Vector3(-22.0, 4.0, -72.0),
-      caption: { kicker: 'MÉLANGE VEIN', title: 'Pre-Spice Blow & Dust Vortex Basin' }
+      position: new THREE.Vector3(-4.5, safeY(-4.5, -26.0, 9.8), -26.0),
+      target: new THREE.Vector3(-22.5, 11.8, -70.0),
+      caption: { kicker: 'MÉLANGE VEIN', title: 'Pre-Spice Blow & Swirling Dust Devils' }
     }
   };
 }
 
 function buildDirectorCurves() {
   const waypoints = [
-    // Leg 1: SIETCH DEW BASIN
+    // Leg 1: SIETCH DEW BASIN (framed so Windtrap finial sits cleanly beside top-left HUD badge!)
     {
-      pos: [0.4, safeY(0.4, 15.8, 2.0), 15.8],
-      tgt: [0.0, 1.5, -18.0]
+      pos: [1.15, safeY(1.15, 13.6, 1.82), 13.6],
+      tgt: [-1.2, 1.95, -18.0]
     },
     {
       pos: [2.6, safeY(2.6, 13.4, getGroundHeight(2.6, 13.4) + 0.72), 13.4],

@@ -1,0 +1,76 @@
+{
+  "round": "wave1-r15",
+  "suite": "wave1",
+  "resolution": "1280x720",
+  "errors": [],
+  "warnings": [],
+  "bench": {
+    "frames": 30,
+    "ms": 18,
+    "avgFrameMs": 0.61
+  },
+  "stats": [
+    {
+      "shot": "01_cistern_dawn",
+      "calls": 209,
+      "triangles": 3157777,
+      "tod": 6.65,
+      "weather": "calm"
+    },
+    {
+      "shot": "02_erg_golden",
+      "calls": 101,
+      "triangles": 1919593,
+      "tod": 17.25,
+      "weather": "saltation"
+    },
+    {
+      "shot": "03_twilight_moons",
+      "calls": 36,
+      "triangles": 903535,
+      "tod": 19.15,
+      "weather": "calm"
+    },
+    {
+      "shot": "04_yardang_noon",
+      "calls": 183,
+      "triangles": 3118917,
+      "tod": 12.2,
+      "weather": "mirage"
+    },
+    {
+      "shot": "05_eclipse_vista",
+      "calls": 101,
+      "triangles": 1919593,
+      "tod": 11.4,
+      "weather": "calm"
+    }
+  ],
+  "images": [
+    {
+      "label": "Dew Cistern & Open Erg (Dawn)",
+      "url": "/gauntlet/rounds/wave1-r15/01_cistern_dawn.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/wave1-r15/01_cistern_dawn.png"
+    },
+    {
+      "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+      "url": "/gauntlet/rounds/wave1-r15/02_erg_golden.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/wave1-r15/02_erg_golden.png"
+    },
+    {
+      "label": "Twin Moons & Companion Planet (Twilight)",
+      "url": "/gauntlet/rounds/wave1-r15/03_twilight_moons.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/wave1-r15/03_twilight_moons.png"
+    },
+    {
+      "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+      "url": "/gauntlet/rounds/wave1-r15/04_yardang_noon.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/wave1-r15/04_yardang_noon.png"
+    },
+    {
+      "label": "Canopus Solar Eclipse Corona",
+      "url": "/gauntlet/rounds/wave1-r15/05_eclipse_vista.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/wave1-r15/05_eclipse_vista.png"
+    }
+  ]
+}

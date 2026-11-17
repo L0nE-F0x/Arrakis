@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { chromium } = require('/home/lonefox/.local/share/mise/installs/playwright/latest/node_modules/playwright');
+let chromium;
+try {
+  ({ chromium } = require('playwright-core'));
+} catch {
+  ({ chromium } = require('/home/lonefox/.local/share/mise/installs/playwright/latest/node_modules/playwright'));
+}
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const HISTORY_PATH = path.join(ROOT, 'public/gauntlet/history.json');
@@ -21,8 +26,8 @@ const SUITES = {
     { name: '01_cistern_dawn', label: 'Dew Cistern & Riparian Flora (Dawn)', tod: 6.25, weather: 'calm', cam: 'cistern' },
     { name: '02_macro_flora', label: 'Macro Inkvine, Cacti & Agave', tod: 7.4, weather: 'calm', cam: 'flora' },
     { name: '03_canopy_upward', label: 'Tamarisk Canopy & Twin Moons Upward Shot', tod: 17.85, weather: 'calm', cam: 'canopy' },
-    { name: '04_erg_golden', label: 'Erg Vista Past Blooming Ridge', tod: 17.35, weather: 'saltation', cam: 'ridge' },
-    { name: '05_night_bloom', label: 'Twin-Moon Night & Dew Reflections', tod: 23.2, weather: 'calm', cam: 'flora' }
+    { name: '04_erg_golden', label: 'Erg Vista Past Blooming Ridge', tod: 17.35, weather: 'saltation', cam: 'bloomingRidge' },
+    { name: '05_night_bloom', label: 'Twin-Moon Night & Dew Reflections', tod: 23.2, weather: 'calm', cam: 'nightBloom' }
   ],
   wave3: [
     { name: '01_cistern_dawn', label: 'Opening Shot — Cistern, Mist & Flora (Dawn)', tod: 6.28, weather: 'calm', cam: 'cistern' },
@@ -31,7 +36,7 @@ const SUITES = {
     { name: '04_worm_breach', label: 'Shai-Hulud Sandworm Breach Across Erg', tod: 17.4, weather: 'saltation', cam: 'worm', breach: true },
     { name: '05_coriolis_storm', label: 'Coriolis Haboob Storm Wall & Static Flash', tod: 16.2, weather: 'coriolisStorm', cam: 'ridge' },
     { name: '06_spice_blow', label: 'Mélange Spice Blow & Dust Devils', tod: 13.4, weather: 'spiceBlow', cam: 'spice' },
-    { name: '07_night_moons', label: 'Twin-Moon Night & Starlight Reflection', tod: 23.3, weather: 'calm', cam: 'horizon' },
+    { name: '07_night_moons', label: 'Twin-Moon Night & Starlight Reflection', tod: 23.3, weather: 'calm', cam: 'nightCistern' },
     { name: '08_hud_overview', label: 'Interactive HUD + Sunrise Panorama', tod: 6.45, weather: 'dustDevil', cam: 'director', hud: true }
   ]
 };
@@ -69,7 +74,8 @@ async function main() {
   const outDir = path.join(ROOT, 'public/gauntlet/rounds', round);
   fs.mkdirSync(outDir, { recursive: true });
 
-  const vite = spawn('npx', ['vite', 'preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+  const viteBin = path.join(ROOT, 'node_modules/vite/bin/vite.js');
+  const vite = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe']
   });

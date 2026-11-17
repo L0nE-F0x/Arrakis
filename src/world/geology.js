@@ -1970,6 +1970,8 @@ function buildRockOutcrops(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) {
   const placedAnchors = [];
   const rocksGroup = new THREE.Group();
   rocksGroup.name = 'ArrakisGeologyOutcrops';
+  const outcropBuckets = new Map();
+  const outcropDummy = new THREE.Object3D();
 
   for (let i = 0; i < specs.length; i++) {
     const s = specs[i];
@@ -1980,29 +1982,14 @@ function buildRockOutcrops(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) {
     const rawRz = Math.max(Math.abs(bbox.max.z), Math.abs(bbox.min.z)) * s.sz;
     const footprintR = Math.max(rawRx, rawRz);
 
-    // 1) Central North sightline x in [-11, 11], z < -10
-    if (Math.abs(s.x) - footprintR * 0.68 < 11.0 && s.z - footprintR * 0.68 < -10.0) {
-      continue;
-    }
-    // 2) Windtrap path clearance
-    if (getPathDistance(s.x, s.z).dist < 2.2 + footprintR * 0.60) {
-      continue;
-    }
-    // 3) Cistern pool clearance
+    if (Math.abs(s.x) - footprintR * 0.68 < 11.0 && s.z - footprintR * 0.68 < -10.0) continue;
+    if (getPathDistance(s.x, s.z).dist < 2.2 + footprintR * 0.60) continue;
     const centerInfo = getTerrainInfo(s.x, s.z);
     const distCistern = Math.hypot(s.x - CISTERN_CENTER.x, s.z - CISTERN_CENTER.z);
-    if (centerInfo.isWater || centerInfo.cisternBowl > 0.08 || distCistern < 7.6 + footprintR * 0.50) {
-      continue;
-    }
-    // 4) Strict Windtrap Bastion (-21, -25) radius >= 7.5m & Thumper (8.5, -14.5) clearance
-    if (Math.hypot(s.x + 21, s.z + 25) < 7.5 + footprintR * 0.55) {
-      continue;
-    }
-    if (Math.hypot(s.x - 8.5, s.z + 14.5) < 3.0 + footprintR * 0.50) {
-      continue;
-    }
+    if (centerInfo.isWater || centerInfo.cisternBowl > 0.08 || distCistern < 7.6 + footprintR * 0.50) continue;
+    if (Math.hypot(s.x + 21, s.z + 25) < 7.5 + footprintR * 0.55) continue;
+    if (Math.hypot(s.x - 8.5, s.z + 14.5) < 3.0 + footprintR * 0.50) continue;
 
-    // Ground deeply (-0.72m) using minimum terrain elevation across footprint so zero sides float
     let minH = centerInfo.height;
     for (const frac of [0.45, 0.78, 1.0]) {
       const sampleR = footprintR * frac;
@@ -2013,15 +2000,95 @@ function buildRockOutcrops(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) {
       }
     }
 
-    const mesh = new THREE.Mesh(geom, rockMat);
-    mesh.position.set(s.x, minH - sinkOutcrop, s.z);
-    mesh.rotation.y = s.yaw;
-    mesh.scale.set(s.sx, s.sy, s.sz);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    rocksGroup.add(mesh);
+    outcropDummy.position.set(s.x, minH - sinkOutcrop, s.z);
+    outcropDummy.rotation.set(0, s.yaw, 0);
+    outcropDummy.scale.set(s.sx, s.sy, s.sz);
+    outcropDummy.updateMatrix();
+    if (!outcropBuckets.has(geom)) outcropBuckets.set(geom, []);
+    outcropBuckets.get(geom).push(outcropDummy.matrix.clone());
 
     placedAnchors.push({ x: s.x, z: s.z, r: footprintR, rx: rawRx, rz: rawRz, type: s.type, yaw: s.yaw });
+  }
+
+  for (const [geom, mats] of outcropBuckets.entries()) {
+    const im = new THREE.InstancedMesh(geom, rockMat, mats.length);
+    im.castShadow = true;
+    im.receiveShadow = true;
+    for (let j = 0; j < mats.length; j++) {
+      im.setMatrixAt(j, mats[j]);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    rocksGroup.add(im);
+  }
+
+  // Sculpted Wind-Eroded Natural Sandstone Arch spanning two western Yardang buttresses (-24.5, -1.5)
+  {
+    const archCurvePts = [];
+    const archSteps = 34;
+    const pA = new THREE.Vector3(-27.2, getGroundHeight(-27.2, -3.8) - 1.4, -3.8);
+    const pB = new THREE.Vector3(-20.4, getGroundHeight(-20.4, 3.6) - 1.4, 3.6);
+    for (let ai = 0; ai <= archSteps; ai++) {
+      const u = ai / archSteps;
+      const arcLift = Math.pow(Math.sin(u * Math.PI), 0.78) * 7.6;
+      const sway = Math.sin(u * Math.PI * 2.0) * 0.45;
+      archCurvePts.push(
+        new THREE.Vector3(
+          mix(pA.x, pB.x, u) + sway,
+          mix(pA.y, pB.y, u) + arcLift,
+          mix(pA.z, pB.z, u) - sway * 0.6
+        )
+      );
+    }
+    const archCurve = new THREE.CatmullRomCurve3(archCurvePts);
+    const archFrames = archCurve.computeFrenetFrames(archSteps, false);
+    const archRings = [];
+    const ringSegs = 18;
+    const archColorAttr = [];
+    const tmpCol = new THREE.Color();
+    for (let ai = 0; ai <= archSteps; ai++) {
+      const u = ai / archSteps;
+      const pt = archCurvePts[ai];
+      const N = archFrames.normals[ai];
+      const B = archFrames.binormals[ai];
+      // Thick battered sandstone piers tapering cleanly at the wind-scoured keystone span
+      const pierFlare = 1.0 + 1.15 * Math.pow(Math.abs(u - 0.5) * 2.0, 2.2);
+      const radW = 0.92 * pierFlare;
+      const radH = 0.76 * (0.85 + 0.75 * Math.pow(Math.abs(u - 0.5) * 2.0, 1.8));
+      const ring = [];
+      for (let si = 0; si < ringSegs; si++) {
+        const ang = (si / ringSegs) * Math.PI * 2;
+        const ca = Math.cos(ang);
+        const sa = Math.sin(ang);
+        const nPerturb =
+          0.84 +
+          0.26 * fbm3(pt.x * 0.35 + ca * 0.8, pt.y * 0.55 + sa * 0.8, pt.z * 0.35, 3) +
+          0.08 * Math.sin(pt.y * 5.2 + ca * 2.0);
+        const vx = pt.x + (N.x * ca * radH + B.x * sa * radW) * nPerturb;
+        const vy = pt.y + (N.y * ca * radH + B.y * sa * radW) * nPerturb;
+        const vz = pt.z + (N.z * ca * radH + B.z * sa * radW) * nPerturb;
+        ring.push(new THREE.Vector3(vx, vy, vz));
+      }
+      archRings.push(ring);
+    }
+    const archGeom = buildLoftedPrism(archRings, archCurvePts[archSteps], archCurvePts[0]);
+    const aPos = archGeom.attributes.position;
+    const aColors = new Float32Array(aPos.count * 3);
+    for (let vi = 0; vi < aPos.count; vi++) {
+      const wy = aPos.getY(vi);
+      const strata = Math.sin(wy * 3.8 + fbm3(aPos.getX(vi) * 0.3, wy * 0.4, aPos.getZ(vi) * 0.3, 2) * 2.2);
+      makeRockVertexColor(tmpCol, clamp((wy - 1.5) / 8.0, 0, 1), wy * 1.4, strata < -0.4 ? 0.35 : 0.05, 0.08, smoothstep(6.2, 8.5, wy));
+      aColors[vi * 3] = tmpCol.r;
+      aColors[vi * 3 + 1] = tmpCol.g;
+      aColors[vi * 3 + 2] = tmpCol.b;
+    }
+    archGeom.setAttribute('color', new THREE.BufferAttribute(aColors, 3));
+    computeCreasedNormals(archGeom, 38);
+    const archMesh = new THREE.Mesh(archGeom, rockMat);
+    archMesh.castShadow = true;
+    archMesh.receiveShadow = true;
+    rocksGroup.add(archMesh);
+    placedAnchors.push({ x: -27.2, z: -3.8, r: 2.4, rx: 2.4, rz: 2.4, type: 'cliffLedge', yaw: 0.4 });
+    placedAnchors.push({ x: -20.4, z: 3.6, r: 2.2, rx: 2.2, rz: 2.2, type: 'cliffLedge', yaw: 0.4 });
   }
 
   // Dense rugged fractured talus boulders & cobbles clustered tightly right across every rock-to-sand intersection
@@ -2877,18 +2944,18 @@ function buildCurbingPathAndPebbles(parentGroup, rockAnchors, atmoUniforms = FAL
 
   const pushFlagstone = (px, pz, tx, tz, variantIdx, tintIdx, scaleMult = 1.0, yawExtra = 0.0, pathT = 0.0) => {
     const info = getTerrainInfo(px, pz);
-    if (info.isWater || info.cisternBowl >= 0.25) return;
+    if (info.isWater || info.cisternBowl >= 0.04 || info.height < WATER_LEVEL + 0.14) return;
 
     const vIdx = variantIdx % flagVariants.length;
     const dim = flagDims[vIdx];
-    // Uphill scale maintenance/boost keeps distant Windtrap approach slabs bold and readable (zero tiny pebbles)
-    const uphillScale = mix(1.0, 1.30, smoothstep(0.38, 0.96, pathT));
-    const sx = (0.90 + rand() * 0.20) * scaleMult * uphillScale;
-    const sz = (0.90 + rand() * 0.20) * scaleMult * uphillScale;
+    // Organic broken slab proportions & sand-drifted seating (never uniform oatmeal hexagons!)
+    const uphillScale = mix(0.95, 1.26, smoothstep(0.38, 0.96, pathT));
+    const sx = (0.72 + rand() * 0.50) * scaleMult * uphillScale;
+    const sz = (0.64 + rand() * 0.44) * scaleMult * uphillScale;
     const approxR = Math.max(dim.w * sx, dim.d * sz) * 0.40;
     if (scaleMult < 0.95 && overlapsPlacedFlagstone(px, pz, approxR)) return;
 
-    const yaw = Math.atan2(tx, tz) + (rand() - 0.5) * 0.68 + yawExtra;
+    const yaw = Math.atan2(tx, tz) + (rand() - 0.5) * 1.35 + yawExtra;
     const cosY = Math.cos(yaw);
     const sinY = Math.sin(yaw);
     const halfW = dim.w * 0.5 * sx * 0.96;
@@ -4148,22 +4215,102 @@ function buildWindtrapSpire(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) 
   const capParapet = createSmoothProfiledLoft(parapetStops, { arcSegs: 6, flatSegs: 2, creaseDeg: 54 });
   stoneParts.push(preparePart(capParapet, 0xc89a68, 0.05));
 
+  // Aerodynamic Crown: Twin Curved Badgir Wind-Scoop Horns (y = 10.35..14.35m) + Bronze Dew-Condenser Mast
   const domeStops = [];
-  for (let i = 0; i <= 10; i++) {
-    const u = i / 10;
-    // Smooth elliptical vaulted dome hood tapering cleanly toward apex (zero faceted octagon cap!)
-    const domeCos = Math.pow(Math.cos(u * Math.PI * 0.44), 0.82);
-    const r = 1.15 * domeCos;
-    const ch = mix(r * 0.44, r * 0.94, smoothstep(0.15, 0.95, u));
-    domeStops.push({ y: mix(10.40, 10.76, Math.sin(u * Math.PI * 0.5)), r, ch });
+  for (let i = 0; i <= 8; i++) {
+    const u = i / 8;
+    const domeCos = Math.pow(Math.cos(u * Math.PI * 0.42), 0.85);
+    const r = 1.26 * domeCos;
+    const ch = mix(r * 0.42, r * 0.90, smoothstep(0.15, 0.95, u));
+    domeStops.push({ y: mix(10.36, 10.88, Math.sin(u * Math.PI * 0.5)), r, ch });
   }
   const capRoof = createSmoothProfiledLoft(domeStops, {
     arcSegs: 6,
     flatSegs: 2,
     creaseDeg: 58,
-    topCapY: 10.78
+    topCapY: 10.90
   });
-  trimParts.push(preparePart(capRoof, 0x6b5340, 0.04));
+  trimParts.push(preparePart(capRoof, 0x735944, 0.04));
+
+  // Sweeping Asymmetric Twin Badgir Wind-Catcher Horns (iconic Villeneuve / Fremen desert silhouette!)
+  for (const hornCfg of [
+    { side: -1, hTop: 14.35, lean: 0.48, zBias: -0.18, scaleW: 1.0 },
+    { side: 1, hTop: 13.15, lean: 0.36, zBias: 0.16, scaleW: 0.88 }
+  ]) {
+    const hornRings = [];
+    const hSteps = 12;
+    const ringPts = 20;
+    for (let hi = 0; hi <= hSteps; hi++) {
+      const u = hi / hSteps;
+      const y = mix(10.25, hornCfg.hTop, u);
+      const curveIn = Math.sin(u * Math.PI * 0.65) * hornCfg.lean - Math.pow(u, 2.2) * 0.62;
+      const cx = hornCfg.side * (1.18 + curveIn * 0.45);
+      const cz = hornCfg.zBias * (1.0 - u * 0.4);
+      const rx = mix(0.46, 0.09, Math.pow(u, 0.85)) * hornCfg.scaleW;
+      const rz = mix(0.86, 0.24, Math.pow(u, 0.78)) * hornCfg.scaleW;
+      const ring = [];
+      for (let pi = 0; pi < ringPts; pi++) {
+        const ang = (pi / ringPts) * Math.PI * 2;
+        const ca = Math.cos(ang);
+        const sa = Math.sin(ang);
+        // Concave inner scoop channel facing the central condenser needle
+        const scoop = hornCfg.side * ca < 0 ? 1.0 - 0.34 * Math.abs(ca) * smoothstep(0.08, 0.85, u) : 1.0;
+        ring.push(new THREE.Vector3(cx + ca * rx * scoop, y, cz + sa * rz));
+      }
+      hornRings.push(ring);
+    }
+    const hornGeom = buildLoftedPrism(
+      hornRings,
+      new THREE.Vector3(hornCfg.side * 0.92, hornCfg.hTop + 0.08, hornCfg.zBias * 0.6),
+      new THREE.Vector3(hornCfg.side * 1.18, 10.20, hornCfg.zBias)
+    );
+    computeCreasedNormals(hornGeom, 42);
+    stoneParts.push(applyVerticalWindStreaks(preparePart(hornGeom, 0xc99b6a, 0.04), 0.10));
+
+    // Bronze cross-strut tying each wind-scoop horn into the central condenser spire
+    const tieBar = new THREE.CylinderGeometry(0.042, 0.052, 1.18, 8);
+    tieBar.rotateZ(Math.PI * 0.5);
+    tieBar.translate(hornCfg.side * 0.58, 11.85 + (hornCfg.side < 0 ? 0.35 : -0.15), hornCfg.zBias * 0.5);
+    bronzeParts.push(preparePart(tieBar, 0xc89e70, 0.04));
+  }
+
+  // Tall Central Bronze Electrostatic Dew-Condenser Spire & Collector Rings (y = 10.75..16.15m)
+  const spireMast = new THREE.CylinderGeometry(0.026, 0.125, 5.40, 10);
+  spireMast.translate(0, 13.45, 0);
+  bronzeParts.push(preparePart(spireMast, 0xc89e70, 0.04));
+
+  for (const [ry, rr] of [
+    [11.35, 0.42],
+    [12.55, 0.31],
+    [13.75, 0.21],
+    [14.85, 0.12]
+  ]) {
+    const cRing = new THREE.TorusGeometry(rr, 0.026, 8, 20);
+    cRing.rotateX(Math.PI * 0.5);
+    cRing.translate(0, ry, 0);
+    bronzeParts.push(preparePart(cRing, 0xd4aa7c, 0.04));
+  }
+
+  // Exterior Spar Booms supporting the Fremen Woven Dew-Collector Sails
+  const sailConfigs = [
+    { yaw: 0.52, yTop: 8.35, yBot: 3.95, rInner: 1.72, rOuter: 3.65 },
+    { yaw: -0.92, yTop: 7.95, yBot: 3.75, rInner: 1.72, rOuter: 3.45 },
+    { yaw: 2.18, yTop: 8.15, yBot: 4.05, rInner: 1.72, rOuter: 3.35 }
+  ];
+  for (const sc of sailConfigs) {
+    const sparLen = sc.rOuter - sc.rInner + 0.35;
+    const topBoom = new THREE.CylinderGeometry(0.028, 0.052, sparLen, 8);
+    topBoom.rotateZ(-Math.PI * 0.5 + 0.12);
+    topBoom.translate(sc.rInner + sparLen * 0.45, sc.yTop, 0);
+    topBoom.rotateY(sc.yaw);
+    bronzeParts.push(preparePart(topBoom, 0xb88f63, 0.04));
+
+    const botBoom = new THREE.CylinderGeometry(0.024, 0.045, sparLen * 0.86, 8);
+    botBoom.rotateZ(-Math.PI * 0.5 - 0.10);
+    botBoom.translate(sc.rInner + sparLen * 0.38, sc.yBot, 0);
+    botBoom.rotateY(sc.yaw);
+    bronzeParts.push(preparePart(botBoom, 0xb88f63, 0.04));
+  }
 
   const stoneBodyMesh = new THREE.Mesh(mergePreparedParts(stoneParts), stoneMat);
   stoneBodyMesh.castShadow = true;
@@ -4184,6 +4331,80 @@ function buildWindtrapSpire(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) 
   darkIntakeMesh.castShadow = true;
   darkIntakeMesh.receiveShadow = true;
   windtrapGroup.add(darkIntakeMesh);
+
+  // Wind-Billowing Translucent Sun-Bleached Fremen Dew-Collector Woven Sails
+  const sailUniforms = {
+    uTime: { value: 0 },
+    uWindSpeed: { value: 0.45 }
+  };
+  const sailMat = new THREE.MeshStandardMaterial({
+    color: 0xdcc09b,
+    roughness: 0.88,
+    metalness: 0.0,
+    side: THREE.DoubleSide
+  });
+  sailMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = sailUniforms.uTime;
+    shader.uniforms.uWindSpeed = sailUniforms.uWindSpeed;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform float uTime;
+        uniform float uWindSpeed;
+        varying vec2 vSailUv;`
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vSailUv = uv;
+        float pinMask = sin(uv.x * 3.14159265) * (0.28 + 0.72 * sin(uv.y * 3.14159265));
+        float billow = (0.22 + 0.14 * uWindSpeed) * pinMask;
+        float flutter = sin(uTime * (3.4 + uWindSpeed * 2.8) + uv.x * 5.2 - uv.y * 3.8) * 0.055 * (0.4 + uWindSpeed) * uv.x;
+        transformed.z += billow + flutter;`
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        varying vec2 vSailUv;`
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        float weave = 0.94 + 0.06 * sin(vSailUv.x * 90.0) * sin(vSailUv.y * 120.0);
+        float seam = 1.0 - 0.12 * exp(-pow((fract(vSailUv.y * 4.0) - 0.5) / 0.04, 2.0));
+        float hem = mix(0.82, 1.0, smoothstep(0.0, 0.08, min(min(vSailUv.x, 1.0 - vSailUv.x), min(vSailUv.y, 1.0 - vSailUv.y))));
+        diffuseColor.rgb *= weave * seam * hem;`
+      );
+  };
+
+  const sailParts = [];
+  for (const sc of sailConfigs) {
+    const sGeo = new THREE.PlaneGeometry(1, 1, 10, 12);
+    const sPos = sGeo.attributes.position;
+    const sUv = sGeo.attributes.uv;
+    for (let vi = 0; vi < sPos.count; vi++) {
+      const u = sUv.getX(vi);
+      const v = sUv.getY(vi);
+      // Tapered trapezoidal desert moisture sail catenary
+      const outerR = mix(sc.rOuter * 0.86, sc.rOuter, v);
+      const catenaryIn = Math.sin(v * Math.PI) * 0.22 * u;
+      const rx = mix(sc.rInner + 0.06, outerR, u) - catenaryIn;
+      const yTopEdge = sc.yTop + u * (sc.rOuter - sc.rInner) * 0.11;
+      const yBotEdge = sc.yBot - u * (sc.rOuter - sc.rInner) * 0.08;
+      const ry = mix(yBotEdge, yTopEdge, v);
+      sPos.setXYZ(vi, rx, ry, 0);
+    }
+    sGeo.rotateY(sc.yaw);
+    sGeo.computeVertexNormals();
+    sailParts.push(sGeo);
+  }
+  const mergedSailGeo = mergePreparedParts(sailParts.map((g) => preparePart(g, 0xffffff, 0.0)));
+  const sailMesh = new THREE.Mesh(mergedSailGeo, sailMat);
+  sailMesh.castShadow = true;
+  sailMesh.receiveShadow = true;
+  windtrapGroup.add(sailMesh);
 
   // Subtle organic wind-drifted sandstone talus/sand collar wrapping the Windtrap plinth footing (-21, -25)
   const driftCollarMat = enhanceSandstoneMaterial(
@@ -4302,6 +4523,9 @@ function buildWindtrapSpire(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) 
     const windSpeed = worldState ? worldState.windSpeed : 0.45;
     const elapsed = worldState ? worldState.elapsed : 0;
 
+    sailUniforms.uTime.value = elapsed;
+    sailUniforms.uWindSpeed.value = windSpeed;
+
     const omega = 0.48 + windSpeed * 1.15;
     rotorAngle = (rotorAngle + dt * omega) % (Math.PI * 2);
     rotorGroup.rotation.y = rotorAngle;
@@ -4311,8 +4535,8 @@ function buildWindtrapSpire(parentGroup, atmoUniforms = FALLBACK_ATMO_UNIFORMS) 
     const duskNight = clamp(1.0 - smoothstep(-0.08, 0.02, sunY), 0, 1);
     const glowFactor = Math.max(duskNight, eclipse * 0.35);
     const flicker = 0.94 + 0.06 * Math.sin(elapsed * 4.2) * Math.cos(elapsed * 2.7);
-    amberGlowMat.emissiveIntensity = glowFactor * 0.16 * flicker;
-    lanternLight.intensity = glowFactor * 0.42 * flicker;
+    amberGlowMat.emissiveIntensity = glowFactor * 0.22 * flicker;
+    lanternLight.intensity = glowFactor * 0.55 * flicker;
   };
 }
 

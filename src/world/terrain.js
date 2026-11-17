@@ -253,7 +253,9 @@ uniform vec3 uHorizonColor;
 uniform vec3 uZenithColor;
 uniform float uFogDensity;
 uniform float uEclipse;
+uniform float uMirage;
 uniform float uSpiceBlow;
+uniform vec3 uSpiceOrigin;
 uniform vec3 uThumperPos;
 uniform float uThumperPulse;
 uniform float uThumperTrail;
@@ -417,13 +419,14 @@ if ( rippleFade > 0.005 && rippleAmp > 0.005 ) {
   }
 }
 
-// Smooth continuous capillary shore dampness across heightAboveWater (-0.02..+0.06m) with organic ripple wicking
+// Smooth multi-scale capillary shore dampness across heightAboveWater with organic wicking (rich dark wet-sand collar)
+float capMacro = fbm2( vWorldPos.xz * 0.55 + vec2( -1.8, 3.4 ) );
 float capEdgeNoise = fbm2( vWorldPos.xz * 2.10 + vec2( 3.7, -5.2 ) ) * 0.64
                    + vnoise2( vWorldPos.xz * 5.20 - vec2( 2.1, 4.9 ) ) * 0.36;
-float troughWick = clamp( -ripVal, -1.0, 1.0 ) * 0.008 * ( 1.0 - rockFactor ) * ( 1.0 - pathFactor * 0.7 );
-float capTop = 0.06 + ( capEdgeNoise - 0.5 ) * 0.022 + troughWick;
-float pathWetAtten = 1.0 - pathFactor * 0.42 * smoothstep( 0.01, 0.05, heightAboveWater );
-float wetFactor = clamp( ( 1.0 - smoothstep( -0.02, capTop, heightAboveWater ) ) * bankMoisture * pathWetAtten, 0.0, 1.0 );
+float troughWick = clamp( -ripVal, -1.0, 1.0 ) * 0.016 * ( 1.0 - rockFactor ) * ( 1.0 - pathFactor * 0.5 );
+float capTop = 0.095 + capMacro * 0.125 + ( capEdgeNoise - 0.5 ) * 0.045 + troughWick;
+float pathWetAtten = 1.0 - pathFactor * 0.25 * smoothstep( 0.02, 0.10, heightAboveWater );
+float wetFactor = clamp( ( 1.0 - smoothstep( -0.03, capTop, heightAboveWater ) ) * bankMoisture * pathWetAtten, 0.0, 1.0 );
 
 // Gentle ~3.5m wind-coherent sand drift swells for organic foreground undulation
 float swellVal = 0.0;
@@ -607,23 +610,29 @@ if ( rockFactor > 0.005 ) {
   totalGrad = mix( totalGrad, rockGrad, rockFactor );
 }
 
-// 3. Clean Compacted-Sand Windtrap Trail & Subtle Track Contact AO (zero dark mud patches)
+// 3. Sun-Baked Compacted Sandstone-Gravel Qanat Walk & Windtrap Trail
 if ( pathFactor > 0.005 ) {
   float northDissolve = smoothstep( -22.0, -13.0, vWorldPos.z );
-  float trailDrift = fbm2( vWorldPos.xz * 0.36 - wDir * 0.6 );
-  float effectivePath = smoothstep( 0.12, 0.70, vPath ) * smoothstep( 0.16, 0.72, trailDrift * 0.45 + vPath * 0.78 ) * northDissolve;
+  float trailDrift = fbm2( vWorldPos.xz * 0.42 - wDir * 0.6 );
+  float effectivePath = smoothstep( 0.10, 0.66, vPath ) * smoothstep( 0.14, 0.70, trailDrift * 0.42 + vPath * 0.80 ) * northDissolve;
 
-  float trackTone = fbm2( vWorldPos.xz * 0.95 + vec2( 2.3, -5.1 ) );
-  vec3 packedSand = mix(
-    sandColor * vec3( 0.945, 0.930, 0.905 ),
-    sandColor * vec3( 1.005, 0.990, 0.965 ),
-    smoothstep( 0.22, 0.78, trackTone )
+  float trackTone = fbm2( vWorldPos.xz * 1.15 + vec2( 2.3, -5.1 ) );
+  float finePebble = vnoise2( vWorldPos.xz * 19.5 ) * 0.55 + vnoise2( vWorldPos.xz * 44.0 + vec2( 4.1, -1.7 ) ) * 0.45;
+  vec3 crushedLimestoneSand = mix(
+    sandColor * vec3( 1.06, 1.02, 0.96 ),
+    vec3( 0.74, 0.54, 0.32 ),
+    0.34
   );
-  float coreAO = 1.0 - smoothstep( 0.46, 0.95, vPath ) * northDissolve * 0.065;
+  vec3 packedSand = mix(
+    sandColor * vec3( 0.96, 0.94, 0.90 ),
+    crushedLimestoneSand * ( 0.93 + 0.14 * finePebble * detailFade ),
+    smoothstep( 0.18, 0.78, trackTone )
+  );
+  float edgeBankAO = 1.0 - smoothstep( 0.12, 0.45, vPath ) * ( 1.0 - smoothstep( 0.55, 0.92, vPath ) ) * 0.055;
 
-  baseAlbedo = mix( baseAlbedo, packedSand, effectivePath * 0.58 ) * coreAO;
-  terrainRoughness = mix( terrainRoughness, clamp( sandRoughness + 0.025, 0.85, 0.96 ), effectivePath * 0.52 );
-  totalGrad *= mix( 1.0, 0.48, effectivePath );
+  baseAlbedo = mix( baseAlbedo, packedSand, effectivePath * 0.72 ) * edgeBankAO;
+  terrainRoughness = mix( terrainRoughness, clamp( sandRoughness + 0.03, 0.86, 0.96 ), effectivePath * 0.64 );
+  totalGrad *= mix( 1.0, 0.22, effectivePath );
 }
 
 // 4. Dynamic Seismic Thumper Ripples & Shai-Hulud Churning Trench
@@ -665,19 +674,19 @@ if ( uWormTremor > 0.01 ) {
 vec3 surfGrad = totalGrad - n0 * dot( totalGrad, n0 );
 vec3 arrakisWorldNormal = normalize( n0 - surfGrad );
 
-// 5. Continuous Warm Saturated Wet Sand Darkening & Sunlit Shallow Submerged Bed (zero cream outline or taupe mud)
+// 5. Physically Saturated Pore-Water Wet Sand & Sunlit Shallow Submerged Bed (rich dark moisture collar grounding shore)
 if ( wetFactor > 0.005 ) {
-  vec3 wetSand = baseAlbedo * vec3( 0.74, 0.66, 0.53 );
+  vec3 wetSand = pow( max( baseAlbedo, vec3( 0.001 ) ), vec3( 1.28 ) ) * vec3( 0.60, 0.53, 0.44 );
   float subDepthTerrain = max( 0.0, ${WATER_LEVEL.toFixed(2)} - vWorldPos.y );
   vec3 bedTint = wetSand * exp( -subDepthTerrain * vec3( 0.34, 0.24, 0.26 ) );
-  vec3 wetAlbedo = mix( wetSand, bedTint, smoothstep( 0.0, 0.04, subDepthTerrain ) );
-  baseAlbedo = mix( baseAlbedo, wetAlbedo, wetFactor );
+  vec3 wetAlbedo = mix( wetSand, bedTint, smoothstep( 0.0, 0.05, subDepthTerrain ) );
+  baseAlbedo = mix( baseAlbedo, wetAlbedo, wetFactor * 0.92 );
 
-  float wetRough = mix( 0.70, 0.78, smoothstep( 0.0, 0.06, subDepthTerrain ) );
+  float wetRough = mix( 0.36, 0.72, smoothstep( 0.0, 0.08, subDepthTerrain ) );
   terrainRoughness = mix( terrainRoughness, wetRough, wetFactor * ( 1.0 - rockFactor * 0.4 ) );
 }
 
-// 6. Mélange Spice Veins, Quartz Sunlit Shimmer & Distant 3D Dune Sculpting
+// 6. Mélange Spice Veins, Noon Inferior Heat-Mirage & Distant 3D Dune Sculpting
 vec3 arrakisEmissive = vec3( 0.0 );
 vec3 sunDirW = normalize( uSunDir );
 vec3 halfVec = normalize( sunDirW + V );
@@ -686,57 +695,62 @@ float sunDayGate = smoothstep( 0.05, 0.15, sunUp );
 float sunStrength = clamp( uSunIntensity / 2.6, 0.0, 1.2 );
 float dryMargin = 1.0 - smoothstep( 0.01, 0.15, wetFactor );
 
-// Distant 3D windward sunlit vs shadowed leeward relief (100-420m) without abrupt 42m midground shadow crushing
+// Distant 3D windward sunlit vs shadowed leeward relief (100-420m)
 float farFaceSun = dot( arrakisWorldNormal, sunDirW );
 float farLitWindward = smoothstep( -0.04, 0.42, farFaceSun );
 float farLeeShadow = smoothstep( 0.08, -0.36, farFaceSun );
 float farSculpt = smoothstep( 95.0, 210.0, viewDist ) * sandMask;
-baseAlbedo *= mix( 1.0, 1.20, farLitWindward * farSculpt * ( 1.0 - darkGateM ) );
-baseAlbedo *= mix( 1.0, 0.68, farLeeShadow * farSculpt * mix( 1.0, 0.45, darkGateM ) );
+baseAlbedo *= mix( 1.0, 1.22, farLitWindward * farSculpt * ( 1.0 - darkGateM ) );
+baseAlbedo *= mix( 1.0, 0.64, farLeeShadow * farSculpt * mix( 1.0, 0.45, darkGateM ) );
 
-// Eclipse totality umbra grounding across foreground dune while distant silhouettes stand against glowing horizon
+// Cool silver-indigo coronal umbra during eclipse totality (no warm brick-red hotspot!)
 float eclipseUmbra = clamp( uEclipse, 0.0, 1.0 );
 if ( eclipseUmbra > 0.005 ) {
   float fgUmbraMask = 1.0 - smoothstep( 65.0, 210.0, viewDist );
-  float umbraWeight = eclipseUmbra * ( 0.42 + 0.58 * fgUmbraMask );
-  baseAlbedo *= mix( vec3( 1.0 ), vec3( 0.70, 0.63, 0.76 ), umbraWeight );
+  float umbraWeight = eclipseUmbra * ( 0.55 + 0.45 * fgUmbraMask );
+  baseAlbedo *= mix( vec3( 1.0 ), vec3( 0.44, 0.48, 0.66 ), umbraWeight );
 }
 
-// Mélange spice veins (wind-sorted fine violet-cinnamon mineral veins) + glowing cerulean-blue crystals
-float spicePresence = vSpice + uSpiceBlow * 0.45 * ( 1.0 - rockFactor ) * dryMargin;
-if ( spicePresence > 0.015 ) {
-  vec2 spStream = vec2( uAlong * 0.24, uCross * 0.92 );
-  vec2 spWarp = vec2( fbm2( spStream * 0.65 + vec2( 3.1, 7.2 ) ), fbm2( spStream * 0.65 + vec2( 11.4, 2.9 ) ) );
-  float veinA = fbm2( spStream * 1.45 + spWarp * 1.35 - wDir * ( uTime * 0.03 * uSpiceBlow ) );
-  float filament = 1.0 - abs( vnoise2( spStream * 3.8 - spWarp * 1.15 ) * 2.0 - 1.0 );
-  float rippleTroughSettle = mix( 0.58, 1.0, clamp( 0.55 - ripVal * 0.45, 0.0, 1.0 ) );
-  float veinMask = smoothstep( 0.44, 0.82, veinA * 0.62 + filament * 0.38 ) * smoothstep( 0.015, 0.48, spicePresence ) * rippleTroughSettle;
+// Noon Inferior Desert Heat-Mirage: shimmering inverted sky-glint sheet across hot grazing sand flats!
+if ( uMirage > 0.12 && darkGateM < 0.25 ) {
+  float distMirage = smoothstep( 24.0, 62.0, viewDist ) * ( 1.0 - smoothstep( 165.0, 280.0, viewDist ) );
+  float flatGround = smoothstep( 0.78, 0.96, n0.y ) * ( 1.0 - wetFactor ) * ( 1.0 - rockFactor * 0.85 );
+  float grazingRay = 1.0 - smoothstep( 0.025, 0.145, abs( V.y ) );
+  float heatWave = 0.55 + 0.45 * sin( vWorldPos.x * 0.65 + vWorldPos.z * 0.45 - uTime * 5.2 + fbm2( vWorldPos.xz * 0.18 ) * 4.5 );
+  float mirageSheet = clamp( distMirage * flatGround * grazingRay * heatWave * uMirage * 0.92, 0.0, 0.78 );
+  if ( mirageSheet > 0.005 ) {
+    vec3 invertedSkyCol = mix( uHorizonColor * 1.06, mix( vec3( 0.52, 0.76, 1.0 ), uZenithColor * 1.45, 0.55 ), 0.62 );
+    baseAlbedo = mix( baseAlbedo, invertedSkyCol, mirageSheet * 0.68 );
+    arrakisEmissive += invertedSkyCol * mirageSheet * 0.28;
+    terrainRoughness = mix( terrainRoughness, 0.18, mirageSheet * 0.75 );
+  }
+}
 
-  vec3 spiceCinnamon = vec3( 0.28, 0.088, 0.038 );
-  vec3 spiceRust     = vec3( 0.40, 0.135, 0.046 );
-  vec3 spiceViolet   = vec3( 0.16, 0.042, 0.105 );
+// Mélange spice fallout concentrated around Spice Blow crater & leeward troughs (zero closed-loop contour rings or floor() grid!)
+float spiceCraterProx = exp( -pow( length( vWorldPos.xz - uSpiceOrigin.xz ) / 28.0, 2.0 ) );
+float spicePresence = ( vSpice * 0.42 + uSpiceBlow * spiceCraterProx * 0.95 ) * ( 1.0 - rockFactor ) * dryMargin;
+if ( spicePresence > 0.02 ) {
+  vec2 spStream = vec2( uAlong * 0.16, uCross * 0.68 );
+  vec2 spWarp = vec2( fbm2( spStream * 0.55 + vec2( 3.1, 7.2 ) ), fbm2( spStream * 0.55 + vec2( 11.4, 2.9 ) ) );
+  float driftVein = fbm2( spStream * 1.65 + spWarp * 0.85 - wDir * ( uTime * 0.04 * uSpiceBlow ) );
+  float fineStreak = fbm2( vec2( uAlong * 0.42, uCross * 2.1 ) + spWarp * 0.45 );
+  float rippleTroughSettle = mix( 0.65, 1.0, clamp( 0.55 - ripVal * 0.45, 0.0, 1.0 ) );
+  float veinMask = smoothstep( 0.38, 0.78, driftVein * 0.68 + fineStreak * 0.32 ) * smoothstep( 0.02, 0.52, spicePresence ) * rippleTroughSettle;
 
-  vec3 spiceCol = mix( spiceCinnamon, spiceRust, smoothstep( 0.42, 0.88, filament ) * 0.65 );
-  float violetPocket = smoothstep( 0.54, 0.88, veinA ) * ( 0.62 + 0.38 * uSpiceBlow );
-  spiceCol = mix( spiceCol, spiceViolet, violetPocket * 0.72 );
+  vec3 spiceCinnamon = vec3( 0.52, 0.19, 0.068 );
+  vec3 spiceSaffron  = vec3( 0.74, 0.32, 0.105 );
+  vec3 spiceCol = mix( spiceCinnamon, spiceSaffron, smoothstep( 0.35, 0.80, fineStreak ) );
 
-  baseAlbedo = mix( baseAlbedo, spiceCol, veinMask * mix( 0.54, 0.84, uSpiceBlow ) );
-  terrainRoughness = mix( terrainRoughness, 0.86, veinMask * 0.45 );
+  baseAlbedo = mix( baseAlbedo, spiceCol, veinMask * mix( 0.38, 0.76, spiceCraterProx * uSpiceBlow ) );
+  terrainRoughness = mix( terrainRoughness, 0.86, veinMask * 0.40 );
 
-  float crystalFade = smoothstep( 0.050, 0.012, pxSize ) * ( 1.0 - smoothstep( 12.0, 36.0, viewDist ) );
-  if ( crystalFade > 0.01 && uSpiceBlow > 0.02 && dryMargin > 0.01 ) {
-    vec2 cCell = floor( vWorldPos.xz * 28.0 );
-    vec2 cHash = hash22( cCell );
-    float isCrystal = step( 0.88 - uSpiceBlow * 0.14, cHash.x );
-    vec3 crystalN = normalize( arrakisWorldNormal + vec3( cHash.x - 0.5, 0.4, cHash.y - 0.5 ) * 0.55 );
-    float crystalSpec = pow( max( dot( crystalN, halfVec ), 0.0 ), 42.0 );
-    float shimmer = 0.6 + 0.4 * sin( uTime * 3.5 + cHash.y * 28.0 );
-    float blowBoost = smoothstep( 0.02, 0.85, uSpiceBlow ) * 1.55;
-
-    float blueGlint = isCrystal * veinMask * crystalFade * dryMargin * ( 0.22 * shimmer + crystalSpec * 0.9 ) * blowBoost;
-    vec3 ceruleanGlow = vec3( 0.08, 0.52, 1.0 );
-    baseAlbedo = mix( baseAlbedo, ceruleanGlow * 0.45, clamp( blueGlint * 0.4, 0.0, 0.5 ) );
-    arrakisEmissive += ceruleanGlow * blueGlint * 0.72;
+  float crystalFade = smoothstep( 0.055, 0.010, pxSize ) * ( 1.0 - smoothstep( 12.0, 42.0, viewDist ) ) * spiceCraterProx;
+  if ( crystalFade > 0.01 && uSpiceBlow > 0.05 ) {
+    float spk1 = vnoise2( gmUv * 64.0 + vec2( 4.1, -2.7 ) );
+    float spk2 = vnoise2( gmUv.yx * 98.0 - vec2( 3.3, 6.2 ) );
+    float isCrystal = pow( clamp( spk1 * spk2 * 1.52, 0.0, 1.0 ), 8.0 );
+    float shimmer = 0.65 + 0.35 * sin( uTime * 3.5 + spk1 * 24.0 );
+    arrakisEmissive += vec3( 0.18, 0.68, 1.15 ) * isCrystal * crystalFade * shimmer * uSpiceBlow * 0.55;
   }
 }
 
@@ -1072,15 +1086,20 @@ void main() {
     gradWave += clamp( ( wDir * ( nX - nC ) + wPerp * ( nZ - nC ) ) * 12.5, vec2( -0.45 ), vec2( 0.45 ) ) * aa3;
   }
 
-  // Lively capillary ripple amplitude (~0.026..0.044)
-  float capAmp = ( 0.026 + 0.015 * clamp( uWindSpeed, 0.0, 1.25 ) ) * shoreCalm;
+  // Lively capillary ripple amplitude attenuated smoothly at low grazing angles & nocturnal calm (zero TV-static stipple!)
+  vec3 viewDelta = cameraPosition - vWorldPos;
+  float fgViewDist = length( viewDelta );
+  vec3 V = viewDelta / max( fgViewDist, 0.0001 );
+  float grazingCalm = smoothstep( 0.08, 0.36, V.y );
+  float nightCalm = mix( 1.0, 0.38, 1.0 - smoothstep( -0.06, 0.10, uSunDir.y ) );
+  float capAmp = ( 0.022 + 0.012 * clamp( uWindSpeed, 0.0, 1.25 ) ) * shoreCalm * grazingCalm * nightCalm;
   vec2 rippleXZ = gradWave * capAmp;
 
   // Subtle concentric spring / dew-drip rings & thumper shockwave shimmer
   vec2 cDelta = p - vec2( ${CISTERN_CENTER.x.toFixed(2)}, ${CISTERN_CENTER.z.toFixed(2)} );
   float cDist = length( cDelta );
   if ( cDist > 0.01 ) {
-    float cRing = cos( cDist * 8.5 - uTime * 2.8 ) * exp( -cDist * 0.48 ) * 0.0045 * shoreCalm * aa2;
+    float cRing = cos( cDist * 8.5 - uTime * 2.8 ) * exp( -cDist * 0.48 ) * 0.0035 * shoreCalm * grazingCalm * aa2;
     rippleXZ += ( cDelta / cDist ) * cRing;
   }
   if ( uThumperPulse > 0.005 ) {
@@ -1091,15 +1110,12 @@ void main() {
     rippleXZ += tDir * tRing;
   }
 
-  vec3 N = normalize( vec3( -rippleXZ.x * 1.45, 1.0, -rippleXZ.y * 1.45 ) );
-  vec3 viewDelta = cameraPosition - vWorldPos;
-  float fgViewDist = length( viewDelta );
-  vec3 V = viewDelta / max( fgViewDist, 0.0001 );
+  vec3 N = normalize( vec3( -rippleXZ.x * 1.35, 1.0, -rippleXZ.y * 1.35 ) );
   float NdotV = clamp( dot( N, V ), 0.05, 1.0 );
 
   // Perspective-correct reflection lookup with damped shallow-shore distortion so bank silhouette never stipples
   vec2 projUv = vUv.xy / max( vUv.w, 0.0001 );
-  vec2 uvDistort = vec2( rippleXZ.x * 0.48, rippleXZ.y * 0.34 ) * uvDamp;
+  vec2 uvDistort = vec2( rippleXZ.x * 0.40, rippleXZ.y * 0.28 ) * uvDamp * grazingCalm;
   vec2 sampleUv = clamp( projUv + uvDistort, vec2( 0.002 ), vec2( 0.998 ) );
   float noonSun = smoothstep( 0.22, 0.60, uSunDir.y );
   float sunVis = smoothstep( -0.05, 0.25, uSunDir.y );
@@ -1107,16 +1123,15 @@ void main() {
   vec3 R = reflect( -V, N );
   R.y = max( R.y, 0.02 );
   vec3 skyFallback = mix( uSkyColor, uZenithColor, smoothstep( 0.02, 0.44, R.y ) );
-  vec3 skyScatterFloor = max( skyFallback * 0.34, vec3( 0.045, 0.050, 0.068 ) );
+  vec3 skyScatterFloor = max( skyFallback * 0.14, vec3( 0.008, 0.012, 0.024 ) );
 
   vec3 reflColor = texture2D( tDiffuse, sampleUv ).rgb;
   vec3 reflCenter = texture2D( tDiffuse, clamp( projUv, vec2( 0.002 ), vec2( 0.998 ) ) ).rgb;
 
-  // Gently rescue dark rock-shadowed or bank-clipped reflection pixels with sky-horizon bounce
+  // Preserve rich dark reflected silhouettes of overhanging Tamarisk fronds, reeds & Windtrap at dawn/night!
   float rawReflLuma = dot( reflColor, vec3( 0.2126, 0.7152, 0.0722 ) );
-  float nearBlackFill = 1.0 - smoothstep( 0.018, 0.095, rawReflLuma );
-  reflColor = mix( reflColor, max( reflCenter, skyScatterFloor ), nearBlackFill * 0.85 );
-  reflColor = max( reflColor, skyScatterFloor * 0.72 );
+  float nearBlackFill = 1.0 - smoothstep( 0.008, 0.045, rawReflLuma );
+  reflColor = mix( reflColor, max( reflCenter, skyScatterFloor ), nearBlackFill * mix( 0.18, 0.55, noonSun ) );
 
   // Soft highlight compression preserves luminous dawn peach/lavender sky & crisp noon azure without mercury blowout
   float reflLuma = dot( reflColor, vec3( 0.2126, 0.7152, 0.0722 ) );
@@ -1129,46 +1144,51 @@ void main() {
     reflColor *= compressed / max( reflLuma, 0.0001 );
   }
 
-  // True physical Schlick Fresnel (F0 = 0.02, standard 5th power) so grazing dawn captures sky reflections
-  // while shallow rim gate preserves clear translucent golden-amber shallows along the front shore
-  float fresnel = 0.02 + 0.98 * pow( 1.0 - NdotV, 5.0 );
-  float shallowFresnelGate = smoothstep( 0.020, 0.18, vWaterDepth );
-  float effFresnel = clamp( fresnel * shallowFresnelGate, 0.0, 0.74 );
+  // True physical Schlick Fresnel (F0 = 0.02, standard 5th power) with nocturnal mirror boost for Twin-Moon reflections
+  float nightMirror = 1.0 - smoothstep( -0.06, 0.12, uSunDir.y );
+  float fresnel = 0.025 + 0.975 * pow( 1.0 - NdotV, 4.6 );
+  float shallowFresnelGate = smoothstep( 0.018, 0.16, vWaterDepth );
+  float effFresnel = clamp( fresnel * shallowFresnelGate * mix( 1.0, 1.18, nightMirror ), 0.0, mix( 0.76, 0.88, nightMirror ) );
 
   // Beer-Lambert shallow clarity: reveals rippled golden-amber sandy bed along front rim & transitions to mineral oasis depth
   float depthClamped = max( vWaterDepth, 0.0 );
-  float transmittance = exp( -depthClamped * 1.05 );
+  float transmittance = exp( -depthClamped * 1.12 );
 
-  vec3 scatterTint = mix( vec3( 0.036, 0.068, 0.088 ), vec3( 0.026, 0.072, 0.094 ), noonSun );
+  vec3 scatterTint = mix( vec3( 0.032, 0.068, 0.088 ), vec3( 0.022, 0.074, 0.098 ), noonSun );
   vec3 waterSkyAmbient = mix( uSkyColor, uZenithColor, 0.36 ) * 0.46 + uSunColor * ( 0.34 * sunVis * clamp( uSunIntensity / 3.0, 0.08, 1.15 ) );
-  vec3 deepWaterScatter = scatterTint * max( waterSkyAmbient, vec3( 0.14 ) );
-  vec3 shallowAmberGlow = vec3( 0.24, 0.15, 0.06 ) * sunVis * clamp( uSunIntensity / 2.8, 0.08, 1.15 ) * ( 1.0 - smoothstep( 0.03, 0.36, depthClamped ) ) * 0.52;
+  vec3 deepWaterScatter = scatterTint * max( waterSkyAmbient, vec3( 0.10, 0.13, 0.20 ) * ( 0.5 + 0.8 * nightMirror ) );
+  vec3 shallowAmberGlow = vec3( 0.24, 0.15, 0.06 ) * sunVis * clamp( uSunIntensity / 2.8, 0.08, 1.15 ) * ( 1.0 - smoothstep( 0.03, 0.36, depthClamped ) ) * 0.48;
 
-  float skyFacetShade = 0.94 + 0.12 * clamp( 1.0 - R.y * 1.4, 0.0, 1.0 );
-  vec3 tintedRefl = reflColor * skyFacetShade;
+  float skyFacetShade = 0.95 + 0.10 * clamp( 1.0 - R.y * 1.4, 0.0, 1.0 );
+  vec3 tintedRefl = reflColor * skyFacetShade * mix( 1.0, 1.08, nightMirror );
 
   // Physical radiometric transfer over framebuffer bed
   float keepBed = ( 1.0 - effFresnel ) * transmittance;
-  float alphaPhys = clamp( 1.0 - keepBed, 0.0, 0.94 );
+  float alphaPhys = clamp( 1.0 - keepBed, 0.0, 0.95 );
   vec3 waterContrib = ( 1.0 - effFresnel ) * ( 1.0 - transmittance ) * ( deepWaterScatter + shallowAmberGlow ) + effFresnel * tintedRefl;
 
-  // Crisp golden solar capillary sparkles across rippling wavelets
+  // Liquid-silk solar & nocturnal twin-moon capillary sparkles (zero noisy stipple dots at noon)
   vec3 L = normalize( uSunDir );
-  vec3 Nglint = normalize( vec3( -rippleXZ.x * 2.4, 1.0, -rippleXZ.y * 2.4 ) );
+  vec3 Nglint = normalize( vec3( -rippleXZ.x * 1.65, 1.0, -rippleXZ.y * 1.65 ) );
   vec3 Rglint = reflect( -V, Nglint );
   Rglint.y = max( Rglint.y, 0.01 );
   float sunUp = smoothstep( -0.02, 0.14, L.y );
   float RdotL = max( dot( Rglint, L ), 0.0 );
-  float glintMask = smoothstep( 0.030, 0.14, vWaterDepth ) * aa2;
-  float glintSharp = pow( RdotL, 210.0 ) * 1.10 * mix( 1.0, 0.24, noonSun );
-  float glintSoft = pow( RdotL, 76.0 ) * 0.065 * mix( 1.0, 0.12, noonSun );
-  vec3 warmGlintColor = mix( uSunColor, vec3( 1.0, 0.82, 0.46 ), 0.48 );
+  float glintMask = smoothstep( 0.035, 0.16, vWaterDepth ) * aa2;
+  float glintSharp = pow( RdotL, 96.0 ) * 0.68 * mix( 1.0, 0.22, noonSun );
+  float glintSoft = pow( RdotL, 28.0 ) * 0.085 * mix( 1.0, 0.16, noonSun );
+  vec3 warmGlintColor = mix( uSunColor, vec3( 1.0, 0.82, 0.46 ), 0.44 );
   vec3 glintContrib = warmGlintColor * ( glintSharp + glintSoft ) * sunUp * clamp( uSunIntensity / 2.6, 0.08, 1.25 ) * glintMask;
 
-  waterContrib += glintContrib;
+  // Crisp nocturnal obsidian oasis mirror: subtle Twin-Moon glint without milky grey center haze!
+  vec3 moonRefDir = normalize( vec3( -0.11, 0.33, -0.93 ) );
+  float RdotM = max( dot( Rglint, moonRefDir ), 0.0 );
+  vec3 moonShimmer = vec3( 0.62, 0.80, 1.0 ) * ( pow( RdotM, 96.0 ) * 0.22 ) * nightMirror * glintMask;
 
-  float alpha = clamp( shoreFade * alphaPhys + shoreFade * glintSharp * glintMask * 0.025, 0.0, 0.94 );
-  vec3 finalWater = min( ( shoreFade * waterContrib ) / max( alpha, 0.0005 ), vec3( 5.0 ) );
+  waterContrib += glintContrib + moonShimmer;
+
+  float alpha = clamp( shoreFade * alphaPhys + shoreFade * glintSharp * glintMask * 0.025, 0.0, 0.95 );
+  vec3 finalWater = min( ( shoreFade * waterContrib ) / max( alpha, 0.0005 ), vec3( 4.2 ) );
 
   gl_FragColor = vec4( finalWater, alpha );
 
@@ -1178,9 +1198,9 @@ void main() {
   };
 
   const reflector = new Reflector(waterGeo, {
-    clipBias: 0.0,
-    textureWidth: 1024,
-    textureHeight: 1024,
+    clipBias: 0.0035,
+    textureWidth: 768,
+    textureHeight: 768,
     color: 0x6ba6a2,
     shader: customWaterShader
   });
@@ -1233,7 +1253,9 @@ export function createTerrainSystem(scene, worldState) {
     uZenithColor: { value: worldState ? worldState.skyZenithColor.clone() : new THREE.Color(0x4b6088) },
     uFogDensity: { value: worldState ? worldState.fogDensity : 0.0024 },
     uEclipse: { value: worldState ? worldState.eclipseStrength : 0 },
+    uMirage: { value: worldState ? (worldState.weatherWeights?.mirage ?? 0) : 0 },
     uSpiceBlow: { value: worldState ? worldState.spiceBlow.intensity : 0 },
+    uSpiceOrigin: { value: new THREE.Vector3(-21, 0, -68).copy(worldState?.spiceBlow.origin ?? { x: -21, y: 0, z: -68 }) },
     uThumperPos: { value: new THREE.Vector3(8.5, 0, -14.5).copy(worldState?.thumper.position ?? { x: 8.5, y: 0, z: -14.5 }) },
     uThumperPulse: { value: worldState ? worldState.thumper.pulseStrength : 0 },
     uThumperTrail: { value: worldState ? worldState.thumper.pulseStrength : 0 },
@@ -1281,7 +1303,9 @@ export function createTerrainSystem(scene, worldState) {
     terrainUniforms.uZenithColor.value.copy(worldState.skyZenithColor);
     terrainUniforms.uFogDensity.value = worldState.fogDensity;
     terrainUniforms.uEclipse.value = worldState.eclipseStrength;
+    terrainUniforms.uMirage.value = worldState.weatherWeights?.mirage ?? 0;
     terrainUniforms.uSpiceBlow.value = worldState.spiceBlow.intensity;
+    terrainUniforms.uSpiceOrigin.value.copy(worldState.spiceBlow.origin);
     terrainUniforms.uThumperPos.value.copy(worldState.thumper.position);
     terrainUniforms.uThumperPulse.value = pulse;
     terrainUniforms.uThumperTrail.value = thumperTrail;

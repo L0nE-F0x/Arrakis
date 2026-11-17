@@ -61,8 +61,8 @@ const ArrakisAtmoShader = {
         float w3 = sin((vUv.x * 18.0 + vUv.y * 78.0) - uTime * 3.8);
 
         vec2 shimmerOffset = vec2(
-          (w1 * 0.58 + w2 * 0.42) * 0.0021,
-          (w2 * 0.52 + w3 * 0.48) * 0.0011
+          (w1 * 0.58 + w2 * 0.42) * 0.0046,
+          (w2 * 0.52 + w3 * 0.48) * 0.0024
         ) * mirageMask;
 
         sampleUv = clamp(sampleUv + shimmerOffset, vec2(0.0005), vec2(0.9995));

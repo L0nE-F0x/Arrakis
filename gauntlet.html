@@ -122,7 +122,7 @@
               <div class="thumbs">
                 ${(r.images || []).map(img => `
                   <a class="thumb" href="${img.url}" target="_blank">
-                    <img src="${img.url}" loading="lazy" alt="${img.label}" />
+                    <img src="${img.url}" loading="lazy" alt="${img.label}" onerror="this.closest('a').style.display='none'" />
                     <span>${img.label}</span>
                   </a>
                 `).join('')}

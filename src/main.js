@@ -3,6 +3,9 @@ import { WorldState } from './state/worldState.js';
 import { createSkySystem } from './world/sky.js';
 import { createTerrainSystem } from './world/terrain.js';
 import { createGeologyAndProps } from './world/geology.js';
+import { createFloraSystem } from './world/flora.js';
+import { createFaunaSystem } from './world/fauna.js';
+import { createAtmosphereFXSystem } from './world/atmosphereFX.js';
 import { createCameraController } from './world/camera.js';
 import { createPostProcess } from './world/postprocess.js';
 import { createSoundscape } from './audio/soundscape.js';
@@ -35,28 +38,28 @@ function boot() {
   const camera = new THREE.PerspectiveCamera(
     48,
     window.innerWidth / Math.max(1, window.innerHeight),
-    0.12,
+    0.10,
     1200
   );
 
   const worldState = new WorldState();
   scene.fog = new THREE.FogExp2(worldState.fogColor.getHex(), worldState.fogDensity);
 
-  // Canopus Sun key directional light (2048x2048 shadow frustum over focal basin & western Yardangs ~4.1cm/texel)
+  // Canopus Sun key directional light (2048x2048 shadow frustum over entire focal basin, xerophytes & western Yardangs)
   const sunLight = new THREE.DirectionalLight(0xffcfa0, worldState.sunIntensity);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(2048, 2048);
   sunLight.shadow.radius = 1.7;
   sunLight.shadow.camera.near = 1;
-  sunLight.shadow.camera.far = 200;
-  sunLight.shadow.camera.left = -42;
-  sunLight.shadow.camera.right = 42;
-  sunLight.shadow.camera.top = 42;
-  sunLight.shadow.camera.bottom = -42;
+  sunLight.shadow.camera.far = 220;
+  sunLight.shadow.camera.left = -58;
+  sunLight.shadow.camera.right = 58;
+  sunLight.shadow.camera.top = 58;
+  sunLight.shadow.camera.bottom = -58;
   sunLight.shadow.camera.updateProjectionMatrix();
-  sunLight.shadow.bias = -0.00025;
-  sunLight.shadow.normalBias = 0.008;
-  sunLight.target.position.set(-8, 1, -6);
+  sunLight.shadow.bias = -0.0003;
+  sunLight.shadow.normalBias = 0.010;
+  sunLight.target.position.set(-4, 1, -2);
   scene.add(sunLight);
   scene.add(sunLight.target);
 
@@ -75,8 +78,8 @@ function boot() {
   scene.add(hemiLight);
 
   // Dynamic dry-lightning sky flash inside Coriolis storm front
-  const lightningLight = new THREE.PointLight(0xd4e4ff, 0, 320, 1.5);
-  lightningLight.position.set(0, 38, -68);
+  const lightningLight = new THREE.PointLight(0xd4e4ff, 0, 360, 1.5);
+  lightningLight.position.set(0, 38, -96);
   scene.add(lightningLight);
 
   function syncLightingAndFog() {
@@ -98,15 +101,15 @@ function boot() {
       worldState.moonKrellnDir.z
     ).normalize();
     moonLight.position.copy(moonLight.target.position).addScaledVector(_moonPosDir, 90);
-    moonLight.intensity = worldState.moonIntensity * 1.65;
+    moonLight.intensity = worldState.moonIntensity * 0.92;
     moonLight.color.setHex(0xd2e0f7).lerp(_tmpColor.setHex(0xd8a87e), worldState.eclipseStrength * 0.60);
 
     hemiLight.color.copy(worldState.ambientSkyColor);
     hemiLight.groundColor.copy(worldState.ambientGroundColor);
     hemiLight.intensity = worldState.ambientIntensity;
 
-    lightningLight.position.set(Math.sin(worldState.elapsed * 2.3) * 32, 38, -68);
-    lightningLight.intensity = worldState.lightningFlash * 360.0;
+    lightningLight.position.set(Math.sin(worldState.elapsed * 2.3) * 28, 38, -96);
+    lightningLight.intensity = worldState.lightningFlash * 380.0;
 
     scene.fog.color.copy(worldState.fogColor);
     if (worldState.lightningFlash > 0.01) {
@@ -117,23 +120,23 @@ function boot() {
     renderer.toneMappingExposure = 1.04 + (worldState.exposure - 1.02);
   }
 
-  if (loadingStatus) loadingStatus.textContent = 'Synthesizing Astral Sky & Erg Dunes…';
+  if (loadingStatus) loadingStatus.textContent = 'Synthesizing Astral Sky, Oasis Flora & Shai-Hulud…';
 
   const skySystem = createSkySystem(scene, worldState);
   const terrainSystem = createTerrainSystem(scene, worldState);
   const geologySystem = createGeologyAndProps(scene, worldState);
+  const floraSystem = createFloraSystem(scene, worldState);
+  const faunaSystem = createFaunaSystem(scene, worldState);
+  const atmoFXSystem = createAtmosphereFXSystem(scene, worldState);
   const cameraController = createCameraController(camera, renderer.domElement, worldState);
   const postProcess = createPostProcess(renderer, scene, camera, worldState);
   const soundscape = createSoundscape(worldState);
 
   const hud = initHud(worldState, cameraController, {
     onToggleAudio: () => soundscape.toggle(),
-    onThumper: () => {
-      // Thumper pulse state is updated in worldState and read by terrain/geology/camera
-    }
+    onThumper: () => {}
   });
 
-  // Respect ?clean=1 query hint on direct page visits
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('clean') === '1') {
     hud.setHudVisible(false);
@@ -146,11 +149,13 @@ function boot() {
     skySystem?.update?.(dt, camera);
     terrainSystem?.update?.(dt, camera);
     geologySystem?.update?.(dt, camera);
+    floraSystem?.update?.(dt, camera);
+    faunaSystem?.update?.(dt, camera);
+    atmoFXSystem?.update?.(dt, camera);
     soundscape?.update?.(dt);
     hud.update(dt);
   }
 
-  // Initial synchronous warm-up compile & first frame render
   if (loadingStatus) loadingStatus.textContent = 'Compiling WebGL2 Atmospheric Shaders…';
   syncLightingAndFog();
   stepSimulation(0.016);
@@ -183,7 +188,7 @@ function boot() {
   }
   window.addEventListener('resize', handleResize);
 
-  // Deterministic gauntlet capture & diagnostic API
+  // Deterministic Gauntlet capture & diagnostic API
   window.__ARRAKIS__ = {
     ready: true,
     state: worldState,
@@ -196,15 +201,16 @@ function boot() {
       }
       worldState.autoTime = false;
       worldState.autoWeather = false;
+      worldState.elapsed = 1.25;
 
       if (shot.weather) {
         worldState.setWeather(shot.weather);
       }
-      // Calling update(0) sets step = 0, snapping weatherWeights & eclipseStrength immediately
       worldState.update(0);
 
       if (shot.weather === 'coriolisStorm') {
-        worldState.lightningFlash = 0.65;
+        worldState.lightningSeed = 4.25;
+        worldState.lightningFlash = 1.25;
       } else {
         worldState.lightningFlash = 0;
       }
@@ -216,13 +222,23 @@ function boot() {
         worldState.thumper.timer = 0;
         worldState.thumper.pulseStrength = 0;
       }
+
       if (shot.breach) {
-        worldState.triggerBreach();
+        // Position Shai-Hulud at peak awe-inspiring mid-air breach arc during deterministic capture!
+        worldState.triggerBreach(12, -106, 0.45);
       } else {
         worldState.worm.phase = 'patrol';
         worldState.worm.breachProgress = 0;
         worldState.worm.breachTimer = 16;
       }
+
+      // Reset deterministic dust devil showcase coordinates (visible in both 06_spice_blow & 08_hud_overview!)
+      worldState.dustDevils[0].x = -35.0;
+      worldState.dustDevils[0].z = -72;
+      worldState.dustDevils[1].x = -9.5;
+      worldState.dustDevils[1].z = -54;
+      worldState.dustDevils[2].x = 2.5;
+      worldState.dustDevils[2].z = -64;
 
       cameraController.setPreset(shot.cam || 'director', true);
 
@@ -234,6 +250,9 @@ function boot() {
       skySystem?.update?.(0, camera);
       terrainSystem?.update?.(0, camera);
       geologySystem?.update?.(0, camera);
+      floraSystem?.update?.(0, camera);
+      faunaSystem?.update?.(0, camera);
+      atmoFXSystem?.update?.(0, camera);
       hud.syncFromState();
     },
     async renderSteps(count = 1, dt = 0.016) {
@@ -242,6 +261,9 @@ function boot() {
         const steps = Math.max(1, Math.floor(count));
         for (let i = 0; i < steps; i++) {
           stepSimulation(dt);
+          if (worldState.targetWeather === 'coriolisStorm' && !worldState.autoWeather && worldState.lightningFlash > 0.2) {
+            worldState.lightningFlash = Math.max(worldState.lightningFlash, 1.05);
+          }
           postProcess.render(dt);
         }
         await new Promise(resolve => requestAnimationFrame(resolve));

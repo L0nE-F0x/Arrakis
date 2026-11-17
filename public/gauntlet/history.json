@@ -449,6 +449,456 @@
           "url": "/gauntlet/rounds/wave1-r15/05_eclipse_vista.png"
         }
       ]
+    },
+    {
+      "round": "carbon-w1-r1",
+      "title": "Round carbon-w1-r1 (wave1)",
+      "timestamp": "2026-11-17T17:09:31.166Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 5.85 ms/frame · Calls: 271 · Tris: 7463951 · Errors: 0",
+      "summary": "R1 self-audit: curved-blade white tintGeometry overwrite bleached Tamarisk/reed/agave foliage; un-masked GL_POINTS rendered square saltation boxes; sub-grid Star-Dune summit spikes & patrol worm puff spheres on Erg; West Tamarisk blocked Yardang arch; spoke-like eclipse rays.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w1-r1/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/carbon-w1-r1/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/carbon-w1-r1/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/carbon-w1-r1/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/carbon-w1-r1/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w2-r1",
+      "title": "Round carbon-w2-r1 (wave2)",
+      "timestamp": "2026-11-17T17:11:38.559Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 5.93 ms/frame · Calls: 271 · Tris: 7463951 · Errors: 0",
+      "summary": "R1 self-audit: white-overwritten curved-blade vertex colors bleached Tamarisk canopy, reeds & agaves; canopy camera pitch needed +1.3m lift to frame Twin Moons + Ringed Planet cleanly inside crown.",
+      "images": [
+        {
+          "label": "Dew Cistern & Riparian Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w2-r1/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro Inkvine, Cacti & Agave",
+          "url": "/gauntlet/rounds/carbon-w2-r1/02_macro_flora.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Twin Moons Upward Shot",
+          "url": "/gauntlet/rounds/carbon-w2-r1/03_canopy_upward.png"
+        },
+        {
+          "label": "Erg Vista Past Blooming Ridge",
+          "url": "/gauntlet/rounds/carbon-w2-r1/04_erg_golden.png"
+        },
+        {
+          "label": "Twin-Moon Night & Dew Reflections",
+          "url": "/gauntlet/rounds/carbon-w2-r1/05_night_bloom.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w3-r1",
+      "title": "Round carbon-w3-r1 (wave3)",
+      "timestamp": "2026-11-17T17:12:40.645Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 6.35 ms/frame · Calls: 271 · Tris: 7463951 · Errors: 0",
+      "summary": "R1 self-audit: foreground flower spike partially occluded MuadDib left cheek; square GL_POINTS on Shai-Hulud sand spray & Spice Blow motes; patrol puff spheres visible in storm/night; spice camera needed wider framing to pair Spice Blow with Dust Devil.",
+      "images": [
+        {
+          "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w3-r1/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro MuadDib Foraging by Desert Flora",
+          "url": "/gauntlet/rounds/carbon-w3-r1/02_macro_muaddib.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Canopus/Krelln",
+          "url": "/gauntlet/rounds/carbon-w3-r1/03_canopy_sky.png"
+        },
+        {
+          "label": "Shai-Hulud Sandworm Breach Across Erg",
+          "url": "/gauntlet/rounds/carbon-w3-r1/04_worm_breach.png"
+        },
+        {
+          "label": "Coriolis Haboob Storm Wall & Static Flash",
+          "url": "/gauntlet/rounds/carbon-w3-r1/05_coriolis_storm.png"
+        },
+        {
+          "label": "Mélange Spice Blow & Dust Devils",
+          "url": "/gauntlet/rounds/carbon-w3-r1/06_spice_blow.png"
+        },
+        {
+          "label": "Twin-Moon Night & Starlight Reflection",
+          "url": "/gauntlet/rounds/carbon-w3-r1/07_night_moons.png"
+        },
+        {
+          "label": "Interactive HUD + Sunrise Panorama",
+          "url": "/gauntlet/rounds/carbon-w3-r1/08_hud_overview.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w1-r2",
+      "title": "Round carbon-w1-r2 (wave1)",
+      "timestamp": "2026-11-17T17:28:34.248Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.3 ms/frame · Calls: 264 · Tris: 6586331 · Errors: 0",
+      "summary": "Wave 1 Critic Audit FAIL: (P0) Flora/cacti at z=-25 photobomb bottom corners of 03_twilight_moons & 05_eclipse_vista without eclipse/twilight albedo dimming; saltation points render as static 1-2px white dots on dark golden-hour dune; repetitive dark-green 2-arm Saguaro cacti & unlit near-black tree bark; ringed planet dark-side sky punch-through, weak ring umbral shadow & static hawk silhouette inside eclipse corona; (P1) Yardang arch partially covered by foreground tree curtain, noon mirage heat-shimmer band too subtle, eclipse disk too close to horizon.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w1-r2/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/carbon-w1-r2/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/carbon-w1-r2/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/carbon-w1-r2/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/carbon-w1-r2/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w2-r2",
+      "title": "Round carbon-w2-r2 (wave2)",
+      "timestamp": "2026-11-17T17:29:22.588Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.59 ms/frame · Calls: 264 · Tris: 6586331 · Errors: 0",
+      "summary": "Wave 2 Critic Audit FAIL: (P0) 04_erg_golden ('Erg Vista Past Blooming Ridge') misses the blooming ridge below frustum; 02_macro_flora & 05_night_bloom share identical camera obstructed by foreground reed culms and missing hero Agave/Cactus framing; 05_night_bloom lacks Twin Moons & mirror-calm nocturnal water reflection; 03_canopy_upward needs steeper upward pitch into Tamarisk crown framing moons/planet + flared organic bark branch collars; (P1) Cistern dawn mist discarded by surface length(vLocalPos) bug, repetitive cartoon Saguaros.",
+      "images": [
+        {
+          "label": "Dew Cistern & Riparian Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w2-r2/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro Inkvine, Cacti & Agave",
+          "url": "/gauntlet/rounds/carbon-w2-r2/02_macro_flora.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Twin Moons Upward Shot",
+          "url": "/gauntlet/rounds/carbon-w2-r2/03_canopy_upward.png"
+        },
+        {
+          "label": "Erg Vista Past Blooming Ridge",
+          "url": "/gauntlet/rounds/carbon-w2-r2/04_erg_golden.png"
+        },
+        {
+          "label": "Twin-Moon Night & Dew Reflections",
+          "url": "/gauntlet/rounds/carbon-w2-r2/05_night_bloom.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w3-r2",
+      "title": "Round carbon-w3-r2 (wave3)",
+      "timestamp": "2026-11-17T17:30:12.290Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.37 ms/frame · Calls: 264 · Tris: 6586331 · Errors: 0",
+      "summary": "Wave 3 Critic Audit FAIL: (P0) 06_spice_blow has global 1-abs(vnoise) contour loop banding on foreground dune + smooth translucent sphere lobes; 05_coriolis_storm has smooth sphere clouds + fogged-out additive lightning (missing fog:false); 02_macro_muaddib has burrowMesh brown cylinder wedge behind hip & frontal pose hiding kangaroo tail; 04_worm_breach has inter-segment sky gaps, smooth hood, moire thin teeth & hard Z-clipped dust spheres; 01_cistern_dawn mist 99% discarded; 07_night_moons lacks water reflection & has corner flora; (P1) Dust devils too faint/off-axis, midnight hawks, HUD wind slider/checkbox polish.",
+      "images": [
+        {
+          "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w3-r2/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro MuadDib Foraging by Desert Flora",
+          "url": "/gauntlet/rounds/carbon-w3-r2/02_macro_muaddib.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Canopus/Krelln",
+          "url": "/gauntlet/rounds/carbon-w3-r2/03_canopy_sky.png"
+        },
+        {
+          "label": "Shai-Hulud Sandworm Breach Across Erg",
+          "url": "/gauntlet/rounds/carbon-w3-r2/04_worm_breach.png"
+        },
+        {
+          "label": "Coriolis Haboob Storm Wall & Static Flash",
+          "url": "/gauntlet/rounds/carbon-w3-r2/05_coriolis_storm.png"
+        },
+        {
+          "label": "Mélange Spice Blow & Dust Devils",
+          "url": "/gauntlet/rounds/carbon-w3-r2/06_spice_blow.png"
+        },
+        {
+          "label": "Twin-Moon Night & Starlight Reflection",
+          "url": "/gauntlet/rounds/carbon-w3-r2/07_night_moons.png"
+        },
+        {
+          "label": "Interactive HUD + Sunrise Panorama",
+          "url": "/gauntlet/rounds/carbon-w3-r2/08_hud_overview.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w1-r3",
+      "title": "Round carbon-w1-r3 (wave1)",
+      "timestamp": "2026-11-17T18:13:37.861Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.26 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "R3 self-audit: Krelln & Arvon sunlitGain exceeded bloom threshold making bright gibbous discs instead of slender crescents; saltation ribbons & dust devil multi-shell cone showed geometric outlines in 02_erg_golden.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w1-r3/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/carbon-w1-r3/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/carbon-w1-r3/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/carbon-w1-r3/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/carbon-w1-r3/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w2-r3",
+      "title": "Round carbon-w2-r3 (wave2)",
+      "timestamp": "2026-11-17T18:14:04.615Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.71 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "R3 self-audit: 04_erg_golden needed dedicated lower bloomingRidge camera to showcase foreground Blooming Ridge flora; 05_night_bloom Spice-Lilies had cosine zebra stripes; moons slightly over-bloomed.",
+      "images": [
+        {
+          "label": "Dew Cistern & Riparian Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w2-r3/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro Inkvine, Cacti & Agave",
+          "url": "/gauntlet/rounds/carbon-w2-r3/02_macro_flora.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Twin Moons Upward Shot",
+          "url": "/gauntlet/rounds/carbon-w2-r3/03_canopy_upward.png"
+        },
+        {
+          "label": "Erg Vista Past Blooming Ridge",
+          "url": "/gauntlet/rounds/carbon-w2-r3/04_erg_golden.png"
+        },
+        {
+          "label": "Twin-Moon Night & Dew Reflections",
+          "url": "/gauntlet/rounds/carbon-w2-r3/05_night_bloom.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w3-r3",
+      "title": "Round carbon-w3-r3 (wave3)",
+      "timestamp": "2026-11-17T23:08:48.591Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.13 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "R3 self-audit: Multi-shell dust devil showed concentric cone facets; foreground Agave at (4.22, 9.58) clipped across MuadDib hip; flat ejecta/sand-curtain planes needed volumetric FBM breakup; storm wall needed darker contrast.",
+      "images": [
+        {
+          "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w3-r3/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro MuadDib Foraging by Desert Flora",
+          "url": "/gauntlet/rounds/carbon-w3-r3/02_macro_muaddib.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Canopus/Krelln",
+          "url": "/gauntlet/rounds/carbon-w3-r3/03_canopy_sky.png"
+        },
+        {
+          "label": "Shai-Hulud Sandworm Breach Across Erg",
+          "url": "/gauntlet/rounds/carbon-w3-r3/04_worm_breach.png"
+        },
+        {
+          "label": "Coriolis Haboob Storm Wall & Static Flash",
+          "url": "/gauntlet/rounds/carbon-w3-r3/05_coriolis_storm.png"
+        },
+        {
+          "label": "Mélange Spice Blow & Dust Devils",
+          "url": "/gauntlet/rounds/carbon-w3-r3/06_spice_blow.png"
+        },
+        {
+          "label": "Twin-Moon Night & Starlight Reflection",
+          "url": "/gauntlet/rounds/carbon-w3-r3/07_night_moons.png"
+        },
+        {
+          "label": "Interactive HUD + Sunrise Panorama",
+          "url": "/gauntlet/rounds/carbon-w3-r3/08_hud_overview.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w1-r4",
+      "title": "Round carbon-w1-r4 (wave1)",
+      "timestamp": "2026-11-17T23:18:26.958Z",
+      "verdict": "PASS",
+      "metrics": "1280x720 · 0.5 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "Wave 1 Critic Audit PASS: All 5 Wave 1 shots clear P0/P1 visual & technical bars (0 errors/warnings, 0.50 ms/frame at 1280x720). Naturalistic dawn cistern mist & planar reflections, clean S-curve Erg slipfaces with soft saltation wisps, coherent astral crescent phases & ringed-planet umbral shadow, unobstructed sandstone Yardang arch + horned Windtrap at noon, and realistic dipole helmet-streamer Canopus eclipse corona.",
+      "images": [
+        {
+          "label": "Dew Cistern & Open Erg (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w1-r4/01_cistern_dawn.png"
+        },
+        {
+          "label": "Great Erg Dunes & Astral Sky (Golden Hour)",
+          "url": "/gauntlet/rounds/carbon-w1-r4/02_erg_golden.png"
+        },
+        {
+          "label": "Twin Moons & Companion Planet (Twilight)",
+          "url": "/gauntlet/rounds/carbon-w1-r4/03_twilight_moons.png"
+        },
+        {
+          "label": "Sandstone Yardangs & Windtrap Path (Noon)",
+          "url": "/gauntlet/rounds/carbon-w1-r4/04_yardang_noon.png"
+        },
+        {
+          "label": "Canopus Solar Eclipse Corona",
+          "url": "/gauntlet/rounds/carbon-w1-r4/05_eclipse_vista.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w2-r4",
+      "title": "Round carbon-w2-r4 (wave2)",
+      "timestamp": "2026-11-17T23:19:08.099Z",
+      "verdict": "PASS",
+      "metrics": "1280x720 · 0.65 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "Wave 2 Critic Audit PASS: All 5 botanical, riparian & nocturnal shots fulfill brief with 0 errors/warnings and 0.65 ms/frame — misty dawn cistern reflections (01), unobstructed macro Agave/Barrel & Columnar Cacti/Desert Roses/Inkvine/Saffron Mullein (02), upward weeping Tamarisk arch framing crisp crescent Twin Moons & ringed planet (03), vibrant Blooming Ridge overlooking golden-hour Erg dunes (04), and starry Twin-Moon night with smooth cyan/magenta bioluminescent blooms & cistern water reflections (05).",
+      "images": [
+        {
+          "label": "Dew Cistern & Riparian Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w2-r4/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro Inkvine, Cacti & Agave",
+          "url": "/gauntlet/rounds/carbon-w2-r4/02_macro_flora.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Twin Moons Upward Shot",
+          "url": "/gauntlet/rounds/carbon-w2-r4/03_canopy_upward.png"
+        },
+        {
+          "label": "Erg Vista Past Blooming Ridge",
+          "url": "/gauntlet/rounds/carbon-w2-r4/04_erg_golden.png"
+        },
+        {
+          "label": "Twin-Moon Night & Dew Reflections",
+          "url": "/gauntlet/rounds/carbon-w2-r4/05_night_bloom.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w3-r4",
+      "title": "Round carbon-w3-r4 (wave3)",
+      "timestamp": "2026-11-17T23:19:48.032Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 1.21 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "Wave 3 Critic Audit FAIL: (P0) Dust devil non-uniform Y-scale multiplied cone normal.y by 28, discarding funnels in 06_spice_blow & 08_hud_overview; (P1) 1px nocturnal specular fireflies on Tamarisk leaves & milky cistern center haze in 07_night_moons; low contrast on active Director Cut top pill in 08_hud_overview; horizon sky-slits & ridged flash loops in 05_coriolis_storm; caustic stem loops in 06_spice_blow.",
+      "images": [
+        {
+          "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w3-r4/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro MuadDib Foraging by Desert Flora",
+          "url": "/gauntlet/rounds/carbon-w3-r4/02_macro_muaddib.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Canopus/Krelln",
+          "url": "/gauntlet/rounds/carbon-w3-r4/03_canopy_sky.png"
+        },
+        {
+          "label": "Shai-Hulud Sandworm Breach Across Erg",
+          "url": "/gauntlet/rounds/carbon-w3-r4/04_worm_breach.png"
+        },
+        {
+          "label": "Coriolis Haboob Storm Wall & Static Flash",
+          "url": "/gauntlet/rounds/carbon-w3-r4/05_coriolis_storm.png"
+        },
+        {
+          "label": "Mélange Spice Blow & Dust Devils",
+          "url": "/gauntlet/rounds/carbon-w3-r4/06_spice_blow.png"
+        },
+        {
+          "label": "Twin-Moon Night & Starlight Reflection",
+          "url": "/gauntlet/rounds/carbon-w3-r4/07_night_moons.png"
+        },
+        {
+          "label": "Interactive HUD + Sunrise Panorama",
+          "url": "/gauntlet/rounds/carbon-w3-r4/08_hud_overview.png"
+        }
+      ]
+    },
+    {
+      "round": "carbon-w3-r5",
+      "title": "Round carbon-w3-r5 (wave3)",
+      "timestamp": "2026-11-17T23:37:25.157Z",
+      "verdict": "PASS",
+      "metrics": "1280x720 · 2.19 ms/frame · Calls: 270 · Tris: 6777297 · Errors: 0",
+      "summary": "Wave 3 Critic Audit PASS: All 8 fauna, megafauna, extreme-weather & HUD shots clear P0/P1 visual and technical bars (0 errors/warnings, 2.19 ms/frame at 1280x720). Naturalistic dawn cistern mist & reflections (01), unobstructed macro MuadDib foraging pose with full kangaroo-mouse anatomy & tufted tail (02), upward weeping Tamarisk arch framing crescent Twin Moons & ringed planet (03), monumental Shai-Hulud breach with armored segments, crystalline-toothed maw & billowing sand plume (04), oppressive Coriolis haboob wall with forked electrostatic dune strike (05), violent cinnamon Melange spice blow flanked by swirling helical dust devils (06), starry Twin-Moon night with bioluminescent flora & glittering cistern starlight reflections (07), and high-contrast, legible interactive HUD over a dust-devil sunrise panorama (08).",
+      "images": [
+        {
+          "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+          "url": "/gauntlet/rounds/carbon-w3-r5/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro MuadDib Foraging by Desert Flora",
+          "url": "/gauntlet/rounds/carbon-w3-r5/02_macro_muaddib.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Canopus/Krelln",
+          "url": "/gauntlet/rounds/carbon-w3-r5/03_canopy_sky.png"
+        },
+        {
+          "label": "Shai-Hulud Sandworm Breach Across Erg",
+          "url": "/gauntlet/rounds/carbon-w3-r5/04_worm_breach.png"
+        },
+        {
+          "label": "Coriolis Haboob Storm Wall & Static Flash",
+          "url": "/gauntlet/rounds/carbon-w3-r5/05_coriolis_storm.png"
+        },
+        {
+          "label": "Mélange Spice Blow & Dust Devils",
+          "url": "/gauntlet/rounds/carbon-w3-r5/06_spice_blow.png"
+        },
+        {
+          "label": "Twin-Moon Night & Starlight Reflection",
+          "url": "/gauntlet/rounds/carbon-w3-r5/07_night_moons.png"
+        },
+        {
+          "label": "Interactive HUD + Sunrise Panorama",
+          "url": "/gauntlet/rounds/carbon-w3-r5/08_hud_overview.png"
+        }
+      ]
     }
   ]
 }

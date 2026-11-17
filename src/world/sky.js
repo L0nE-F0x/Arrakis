@@ -2,15 +2,15 @@ import * as THREE from 'three';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
 
 const SKY_DOME_RADIUS = 920;
-const KRELLN_DIST = 640;
-const KRELLN_RADIUS = 26;
-const ARVON_DIST = 670;
-const ARVON_RADIUS = 14;
-const PLANET_DIST = 760;
-const PLANET_RADIUS = 19;
+const KRELLN_DIST = 620;
+const KRELLN_RADIUS = 32;
+const ARVON_DIST = 665;
+const ARVON_RADIUS = 14.5;
+const PLANET_DIST = 740;
+const PLANET_RADIUS = 23.5;
 const CANOPUS_CORONA_DIST = 735;
-const ECLIPSE_CORONA_DIST = 612;
-const ECLIPSE_CORONA_HALF = 340;
+const ECLIPSE_CORONA_DIST = 598;
+const ECLIPSE_CORONA_HALF = 370;
 
 const SHARED_UNIFORMS_GLSL = /* glsl */ `
 uniform float uTime;
@@ -36,6 +36,21 @@ float sq(float x) {
 
 float safePow(float x, float e) {
   return pow(max(1e-4, x), e);
+}
+
+// Unified orbital solar illumination direction for moons & companion ringed planet:
+// - Slender, poetic ~38% sunlit crescents on Krelln & Arvon (never blown-out white lightbulbs!)
+// - Matching crescent + crisp Cassini-style planetary umbral shadow across rear-right ring arc!
+vec3 evalLunarSunDir(vec3 rawSunDir, float eclipseAmt) {
+  vec3 slenderCrescentSun = normalize(vec3(-0.92, -0.18, -0.12));
+  float highDayBlend = smoothstep(0.22, 0.58, rawSunDir.y) * (1.0 - eclipseAmt);
+  return normalize(mix(slenderCrescentSun, rawSunDir, highDayBlend * 0.45));
+}
+
+vec3 evalOrbitalSunDir(vec3 rawSunDir, float eclipseAmt) {
+  vec3 grazingWestSun = normalize(vec3(-0.84, -0.16, 0.52));
+  float highDayBlend = smoothstep(0.22, 0.58, rawSunDir.y) * (1.0 - eclipseAmt);
+  return normalize(mix(grazingWestSun, rawSunDir, highDayBlend * 0.45));
 }
 `;
 
@@ -543,25 +558,29 @@ float evalMuadDibMare(vec3 localN) {
   float fbmFine = fbm3(localN * 11.5 + vec3(-3.1, 2.4, 0.7));
   float cellCrack = worleyMare3(localN * 8.2 + vec3(2.9, -1.7, 4.1));
 
-  float globalSeas = smoothstep(0.49, 0.77, fbmBroad) * 0.62;
+  float globalSeas = smoothstep(0.52, 0.80, fbmBroad) * 0.52;
 
-  float mareCentral = mareBasin(localN, vec3(0.08, -0.08, 0.99), 0.25, 0.28, 1.7);
-  float mareWest = mareBasin(localN, vec3(-0.18, 0.09, 0.98), 0.17, 0.24, 4.3);
-  float mareNorthA = mareBasin(localN, vec3(-0.15, 0.30, 0.94), 0.12, 0.22, 7.9);
-  float mareNorthB = mareBasin(localN, vec3(0.01, 0.27, 0.96), 0.11, 0.22, 11.2);
-  float mareEastArc = mareBasin(localN, vec3(0.34, -0.16, 0.92), 0.14, 0.26, 15.4)
-                    + mareBasin(localN, vec3(0.44, 0.04, 0.89), 0.09, 0.22, 19.1) * 0.75;
+  // Iconic geological Muad'Dib (crouched desert kangaroo mouse) dark basalt mare basins on Krelln's near hemisphere:
+  // Arched body, head facing west-left (-x), two swept-back tall ears, kangaroo haunch, and curled tufted tail (+x)
+  float bodyHaunch = mareBasin(localN, vec3(0.08, -0.10, 0.99), 0.23, 0.16, 1.7);
+  float chestHead  = mareBasin(localN, vec3(-0.19, 0.04, 0.98), 0.16, 0.14, 4.3);
+  float snoutTip   = mareBasin(localN, vec3(-0.33, 0.01, 0.94), 0.085, 0.12, 6.1);
+  float earBack    = mareBasin(localN, vec3(-0.10, 0.30, 0.95), 0.115, 0.13, 7.9);
+  float earFront   = mareBasin(localN, vec3(-0.22, 0.27, 0.94), 0.095, 0.12, 11.2);
+  float hindFoot   = mareBasin(localN, vec3(-0.04, -0.30, 0.95), 0.10, 0.14, 13.5);
+  float tailArcA   = mareBasin(localN, vec3(0.32, -0.18, 0.93), 0.105, 0.16, 15.4);
+  float tailArcB   = mareBasin(localN, vec3(0.46, 0.02, 0.89), 0.085, 0.14, 19.1);
+  float tailTuft   = mareBasin(localN, vec3(0.42, 0.20, 0.88), 0.095, 0.13, 22.8);
 
-  float nearSeas = clamp(
-    max(max(mareCentral, mareWest), max(max(mareNorthA, mareNorthB), mareEastArc * 0.82)),
-    0.0,
-    1.0
+  float muadDibFigure = max(
+    max(max(bodyHaunch, chestHead), max(snoutTip, hindFoot * 0.85)),
+    max(max(earBack, earFront), max(tailArcA, max(tailArcB * 0.9, tailTuft)))
   );
 
-  float massifBreakup = smoothstep(0.42, 0.76, cellCrack * 0.55 + fbmFine * 0.45);
-  float mottle = 0.48 + 0.52 * fbm3(localN * 6.4 + vec3(4.1, 1.8, -2.5));
-  float combined = max(nearSeas * 0.88, globalSeas);
-  combined *= (0.42 + 0.58 * massifBreakup) * mottle;
+  float massifBreakup = smoothstep(0.36, 0.76, cellCrack * 0.50 + fbmFine * 0.50);
+  float mottle = 0.56 + 0.44 * fbm3(localN * 6.8 + vec3(4.1, 1.8, -2.5));
+  float combined = max(muadDibFigure * 0.96, globalSeas);
+  combined *= mix(0.68, 1.0, massifBreakup) * mottle;
   return clamp(combined, 0.0, 1.0);
 }
 `;
@@ -697,12 +716,14 @@ function createKrellnShader() {
         float limbAA = silAlpha;
 
         float NdotV = max(0.0, dot(worldN, viewDir));
-        float macroNdotL = dot(worldN, uSunDir);
-        float bumpFade = smoothstep(0.08, 0.28, macroNdotL) * (1.0 - smoothstep(0.76, 0.95, rhoExact));
+        vec3 orbitalSun = mix(evalLunarSunDir(uSunDir, uEclipse), uSunDir, eclipseOccult);
+        float macroNdotL = dot(worldN, orbitalSun);
+        float noonSmooth = smoothstep(0.18, 0.56, uSunDir.y);
+        float bumpFade = smoothstep(0.08, 0.28, macroNdotL) * (1.0 - smoothstep(0.76, 0.95, rhoExact)) * (1.0 - noonSmooth * 0.88);
 
-        // Crater heightfield + perturbed world-space normals across the sunlit crescent
+        // Subtle crater heightfield + perturbed normals (gentle 0.16 relief avoids harsh black stipple!)
         float ejecta;
-        vec3 surfN = perturbLunarNormal(localN, normalize(vBasisX), normalize(vBasisY), normalize(vBasisZ), 0.34 * bumpFade, ejecta);
+        vec3 surfN = perturbLunarNormal(localN, normalize(vBasisX), normalize(vBasisY), normalize(vBasisZ), 0.16 * bumpFade, ejecta);
 
         // Fractured mottled volcanic basalt maria + rayed impact ejecta
         float mareMask = evalMuadDibMare(localN);
@@ -722,41 +743,41 @@ function createKrellnShader() {
         float macroLommel = macroL / max(0.09, macroL + max(0.03, NdotV) * 0.52);
         float macroPhase = macroTerminator * mix(macroL, macroLommel * 1.28, 0.66);
 
-        float microL = max(0.0, dot(surfN, uSunDir));
+        float microL = max(0.0, dot(surfN, orbitalSun));
         float microLommel = microL / max(0.09, microL + max(0.03, NdotV) * 0.52);
         float microPhase = macroTerminator * mix(microL, microLommel * 1.28, 0.66);
         float sunlit = mix(macroPhase, microPhase, bumpFade) * limbAA;
 
         float dayVis = smoothstep(-0.04, 0.22, uSunDir.y);
+        float duskBoost = exp(-sq((uSunDir.y - 0.03) / 0.14)) * 0.55;
+        float noonGlareAtten = smoothstep(0.18, 0.56, uSunDir.y);
 
         vec3 sunTint = mix(
           mix(vec3(1.0, 0.97, 0.92), uSunColor, 0.26),
           mix(vec3(0.94, 0.97, 1.0), uSunColor, 0.16),
           dayVis
         );
-        float sunlitGain = mix(1.12, 1.78, dayVis);
-        // Subtle silver-pearl sunlit crescent scatter in daytime/golden hour so Krelln reads crisply alongside Arvon & planet
+        // Crisp non-blooming crescent at night/dusk, softly muted at dawn/golden-hour, ghost-chalk at noon!
+        float sunlitGain = (mix(0.84, 0.36, dayVis) + duskBoost * 0.35) * mix(1.0, 0.18, noonGlareAtten);
         float pearlRim = smoothstep(0.0, 0.16, macroNdotL) * (0.30 + 0.70 * safePow(1.0 - NdotV, 1.35)) * limbAA;
-        vec3 pearlLift = vec3(0.90, 0.94, 1.0) * pearlRim * 0.42 * dayVis;
+        vec3 pearlLift = vec3(0.90, 0.94, 1.0) * pearlRim * 0.22 * dayVis * (1.0 - noonGlareAtten);
         vec3 bodyLitRadiance = (albedo * sunTint * sunlit * sunlitGain + pearlLift) * (1.0 - eclipseOccult);
 
-        // Subtle Arrakis planetshine illuminating Krelln's night hemisphere in twilight/night (zero totality wash)
+        // Subtle Arrakis dust-shine illuminating Krelln's night hemisphere (revealing the Muad'Dib mare in twilight/night!)
         float nightTwilVis = (1.0 - smoothstep(-0.02, 0.16, uSunDir.y)) * (1.0 - uStorm * 0.85);
-        float planetshineGeom = (0.64 + 0.36 * NdotV) * (1.0 - macroTerminator * 0.85);
-        vec3 planetshineAlbedo = mix(vec3(0.46, 0.48, 0.56), albedo, 0.52);
-        vec3 planetshine = planetshineAlbedo * vec3(0.020, 0.021, 0.030) * planetshineGeom * nightTwilVis * limbAA * (1.0 - eclipseOccult);
+        float planetshineGeom = (0.58 + 0.42 * NdotV) * (1.0 - macroTerminator * 0.85);
+        vec3 planetshineAlbedo = mix(vec3(0.28, 0.30, 0.38), albedo, 0.72);
+        vec3 planetshine = planetshineAlbedo * vec3(0.036, 0.035, 0.048) * planetshineGeom * nightTwilVis * limbAA * (1.0 - eclipseOccult);
 
-        // Krelln lies physically BEHIND Arrakis foreground atmosphere:
-        // - Non-eclipse phases: foreground atmospheric scatter + subtle lunar planetshine (no dark sky cutouts).
-        // - Totality: deep obsidian totality silhouette lifted only by minuscule uniform foreground scatter (zero slate-grey wash, zero 3D sphere shading).
+        // During totality, delicate Arrakis-shine subtly reveals Krelln's volcanic Muad'Dib maria inside the dark lunar silhouette
         vec3 skyMoonUniform = skyForeground;
         float moonTransUniform = transmittance;
         if (eclipseOccult > 0.001) {
           evalAtmosphericScatter(moonDir, skyMoonUniform, moonTransUniform);
         }
-        vec3 umbraCol = vec3(0.0020, 0.0030, 0.0080);
-        vec3 earthshine = vec3(0.0002, 0.0003, 0.0006);
-        vec3 eclipseDiscCol = umbraCol + skyMoonUniform * 0.025 + earthshine * moonTransUniform;
+        vec3 umbraCol = vec3(0.0018, 0.0026, 0.0068);
+        vec3 totalityEarthshine = albedo * vec3(0.0068, 0.0062, 0.0086) * (0.55 + 0.45 * NdotV) * limbAA;
+        vec3 eclipseDiscCol = umbraCol + skyMoonUniform * 0.022 + totalityEarthshine * moonTransUniform;
         vec3 baseSkyCol = mix(skyForeground, eclipseDiscCol, eclipseOccult);
         vec3 col = baseSkyCol + (bodyLitRadiance + planetshine) * transmittance;
         gl_FragColor = vec4(col, silAlpha);
@@ -821,12 +842,14 @@ function createArvonShader() {
         float limbAA = 1.0 - smoothstep(0.995 - pxRim * 0.85, 0.995, rhoExact);
 
         float NdotV = max(0.0, dot(worldN, viewDir));
-        float macroNdotL = dot(worldN, uSunDir);
-        float bumpFade = smoothstep(0.09, 0.30, macroNdotL) * (1.0 - smoothstep(0.72, 0.93, rhoExact));
+        vec3 orbitalSun = evalLunarSunDir(uSunDir, uEclipse);
+        float macroNdotL = dot(worldN, orbitalSun);
+        float noonSmooth = smoothstep(0.18, 0.56, uSunDir.y);
+        float bumpFade = smoothstep(0.09, 0.30, macroNdotL) * (1.0 - smoothstep(0.72, 0.93, rhoExact)) * (1.0 - noonSmooth * 0.88);
 
         // Crisp icy-silicate craters & tectonic fracture rifts inside sunlit crescent
         float ejecta;
-        vec3 surfN = perturbLunarNormal(localN, normalize(vBasisX), normalize(vBasisY), normalize(vBasisZ), 0.18 * bumpFade, ejecta);
+        vec3 surfN = perturbLunarNormal(localN, normalize(vBasisX), normalize(vBasisY), normalize(vBasisZ), 0.11 * bumpFade, ejecta);
 
         float fracture = 1.0 - abs(fbm3(localN * 7.5 + vec3(3.1, -2.2, 4.7)) * 2.0 - 1.0);
         float iceRifts = safePow(fracture, 5.0);
@@ -845,14 +868,16 @@ function createArvonShader() {
         float macroLommel = macroL / max(0.22, macroL + max(0.05, NdotV) * 0.56);
         float macroPhase = macroTerminator * mix(macroL, macroLommel * 1.34, 0.58);
 
-        float microL = max(0.0, dot(surfN, uSunDir));
+        float microL = max(0.0, dot(surfN, orbitalSun));
         float microLommel = microL / max(0.22, microL + max(0.05, NdotV) * 0.56);
         float microPhase = macroTerminator * mix(microL, microLommel * 1.34, 0.58);
         float phase = mix(macroPhase, microPhase, bumpFade) * limbAA;
 
         float dayVis = smoothstep(-0.04, 0.22, uSunDir.y);
+        float duskBoost = exp(-sq((uSunDir.y - 0.03) / 0.14)) * 0.52;
+        float noonGlareAtten = smoothstep(0.18, 0.56, uSunDir.y);
         vec3 sunTint = mix(vec3(0.92, 0.96, 1.0), uSunColor, 0.25);
-        float sunlitGain = mix(1.22, 1.02, dayVis);
+        float sunlitGain = (mix(0.82, 0.34, dayVis) + duskBoost * 0.35) * mix(1.0, 0.18, noonGlareAtten);
         vec3 bodyLitRadiance = albedo * sunTint * phase * sunlitGain;
 
         // Subtle Arrakis planetshine illuminating Arvon's night hemisphere in twilight/night
@@ -872,6 +897,7 @@ function createArvonShader() {
 
 function createPlanetShader() {
   return new THREE.ShaderMaterial({
+    transparent: true,
     depthWrite: true,
     depthTest: true,
     uniforms: createSharedAtmUniforms(),
@@ -932,13 +958,16 @@ function createPlanetShader() {
           albedo = mix(albedo, vec3(0.96, 0.62, 0.38), eye * 0.68);
         }
 
-        // Analytical sub-pixel AA on limb & crisp terminator (zero unlit nightside tint!)
+        // Analytical sub-pixel AA on limb & crisp terminator (never darker than foreground atmosphere!)
         vec3 planetDir = normalize(uGasGiantDir);
         float rhoExact = length(cross(rayDir, planetDir)) / ${(PLANET_RADIUS / PLANET_DIST).toFixed(6)};
         float pxRim = max(length(vec2(dFdx(rhoExact), dFdy(rhoExact))), 0.014);
-        float limbAA = 1.0 - smoothstep(0.996 - pxRim * 0.85, 0.996, rhoExact);
+        float silAlpha = 1.0 - smoothstep(0.996 - pxRim * 0.95, 0.996, rhoExact);
+        if (silAlpha < 0.002) discard;
+        float limbAA = silAlpha;
 
-        float NdotL = dot(worldN, uSunDir);
+        vec3 orbitalSun = evalOrbitalSunDir(uSunDir, uEclipse);
+        float NdotL = dot(worldN, orbitalSun);
         float NdotV = max(0.0, dot(worldN, viewDir));
         float termGrad = length(vec2(dFdx(NdotL), dFdy(NdotL)));
         float termAA = max(termGrad * 1.15, 0.022);
@@ -948,30 +977,32 @@ function createPlanetShader() {
 
         // Clean, slender ivory-gold forward-scattering atmospheric crescent arc strictly on sunlit side
         float fresnel = safePow(1.0 - NdotV, 3.0);
-        float sunForward = safePow(max(0.0, dot(rayDir, uSunDir)), 2.0);
+        float sunForward = safePow(max(0.0, dot(rayDir, orbitalSun)), 2.0);
         float litLimb = fresnel * smoothstep(0.0, 0.14, NdotL) * limbAA;
         vec3 limbHazeCol = mix(vec3(0.98, 0.82, 0.58), vec3(1.0, 0.96, 0.84), sunForward);
 
         // Distant companion planet receives full Canopus sunlight even during lunar eclipse on Arrakis
-        vec3 spaceSun = mix(vec3(1.0, 0.96, 0.89), uSunColor, 0.30);
+        vec3 spaceSun = mix(vec3(1.0, 0.96, 0.89), uSunColor, 0.25);
         float dayVis = smoothstep(-0.04, 0.22, uSunDir.y);
-        float planetGain = mix(0.98, 1.24, dayVis);
+        float duskBoost = exp(-sq((uSunDir.y - 0.03) / 0.15)) * 0.35;
+        float noonGlareAtten = smoothstep(0.18, 0.56, uSunDir.y);
+        float planetGain = (mix(1.26, 0.82, dayVis) + duskBoost) * mix(1.0, 0.12, noonGlareAtten);
 
-        // Subtle icy-ring ringshine + nightside atmospheric bounce in twilight/night/eclipse (zero dark void inside rings)
+        // Subtle icy-ring ringshine on nightside strictly adds positive radiance over skyForeground (zero dark punch-through!)
         float moonSunAng = acos(clamp(dot(uMoonKrellnDir, uSunDir), -0.99999, 0.99999));
         float eclipseTotality = smoothstep(0.072, 0.012, moonSunAng) * smoothstep(0.08, 0.38, uEclipse);
-        float darkSkyVis = max(1.0 - smoothstep(-0.02, 0.16, uSunDir.y), eclipseTotality * 0.92) * (1.0 - uStorm * 0.85);
-        float ringGlowBand = 0.58 + 0.42 * smoothstep(0.06, 0.34, abs(p.y)) * (1.0 - 0.35 * smoothstep(0.78, 0.98, abs(p.y)));
-        float nightSideMask = (0.62 + 0.38 * NdotV) * (1.0 - terminator * 0.85) * limbAA;
-        vec3 ringshineAlbedo = mix(vec3(0.54, 0.48, 0.56), albedo, 0.45);
-        vec3 ringshineCol = ringshineAlbedo * vec3(0.020, 0.019, 0.027) * ringGlowBand * nightSideMask * darkSkyVis;
+        float darkSkyVis = max(1.0 - smoothstep(-0.02, 0.16, uSunDir.y), eclipseTotality * 0.88) * (1.0 - uStorm * 0.85);
+        float ringGlowBand = 0.62 + 0.38 * smoothstep(0.06, 0.34, abs(p.y)) * (1.0 - 0.35 * smoothstep(0.78, 0.98, abs(p.y)));
+        float nightSideMask = (0.58 + 0.42 * NdotV) * (1.0 - terminator * 0.85) * limbAA;
+        vec3 ringshineAlbedo = mix(vec3(0.56, 0.62, 0.78), albedo, 0.45);
+        vec3 ringshineCol = ringshineAlbedo * vec3(0.034, 0.038, 0.052) * ringGlowBand * nightSideMask * darkSkyVis;
 
         vec3 bodyLitRadiance = albedo * spaceSun * lit * planetGain
-                             + limbHazeCol * litLimb * (0.48 + 0.46 * sunForward)
+                             + limbHazeCol * litLimb * (0.48 + 0.46 * sunForward) * (1.0 - noonGlareAtten * 0.8)
                              + ringshineCol;
 
         vec3 col = skyForeground + bodyLitRadiance * transmittance;
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, silAlpha);
       }
     `
   });
@@ -1020,40 +1051,41 @@ function createRingShader() {
         float transmittance;
         evalAtmosphericScatter(rayDir, skyForeground, transmittance);
 
-        // Wispy translucent icy-dust rings (opticalDepth <= 0.16, soft radial penumbra)
+        // Crisp multi-band icy-silicate planetary rings with distinct Cassini & Encke divisions
         float dr = fwidth(rNorm);
-        float aa18 = exp(-sq(dr * 18.0 * 0.55));
-        float aa42 = exp(-sq(dr * 42.0 * 0.55));
+        float aa18 = exp(-sq(dr * 22.0 * 0.55));
+        float aa42 = exp(-sq(dr * 48.0 * 0.55));
 
-        float bandMacro = smoothstep(0.04, 0.28, rNorm) * (1.0 - 0.32 * smoothstep(0.56, 0.96, rNorm));
-        float band18 = 0.78 + 0.22 * sin(rNorm * 18.0 + 0.6) * aa18;
-        float band42 = 0.85 + 0.15 * sin(rNorm * 42.0 - 1.1) * aa42;
-        float cassiniGap = 1.0 - exp(-sq((rNorm - 0.63) / 0.055)) * 0.76;
-        float enckeGap = 1.0 - exp(-sq((rNorm - 0.85) / 0.032)) * 0.42;
-        float edgeFade = smoothstep(0.0, 0.22, rNorm) * (1.0 - smoothstep(0.72, 1.0, rNorm));
+        float bandMacro = smoothstep(0.02, 0.20, rNorm) * (1.0 - 0.24 * smoothstep(0.60, 0.98, rNorm));
+        float band18 = 0.72 + 0.28 * sin(rNorm * 22.0 + 0.6) * aa18;
+        float band42 = 0.82 + 0.18 * sin(rNorm * 48.0 - 1.1) * aa42;
+        float cassiniGap = 1.0 - exp(-sq((rNorm - 0.62) / 0.048)) * 0.88;
+        float enckeGap = 1.0 - exp(-sq((rNorm - 0.85) / 0.028)) * 0.58;
+        float edgeFade = smoothstep(0.0, 0.14, rNorm) * (1.0 - smoothstep(0.80, 1.0, rNorm));
 
-        float opticalDepth = clamp(bandMacro * band18 * band42 * cassiniGap * enckeGap * edgeFade * 0.145, 0.0, 0.155);
+        float opticalDepth = clamp(bandMacro * band18 * band42 * cassiniGap * enckeGap * edgeFade * 0.36, 0.0, 0.38);
 
-        // Ray-sphere intersection from ring fragment toward uSunDir casts crisp-penumbra planet eclipse umbra
-        vec3 sunRay = normalize(uSunDir);
+        // Ray-sphere intersection from ring fragment toward orbitalSun casts crisp Cassini-style planet shadow across rear-right ring arc!
+        vec3 sunRay = evalOrbitalSunDir(uSunDir, uEclipse);
         vec3 rel = (vWorldPos - uPlanetCenter) / uPlanetRadius;
         float tTowardSun = -dot(rel, sunRay);
         float perpDist = length(rel + sunRay * tTowardSun);
-        float antiSunSide = smoothstep(-0.14, 0.16, tTowardSun);
-        float penumbra = smoothstep(0.91, 1.14, perpDist);
-        float ringShadow = mix(1.0, mix(0.025, 1.0, penumbra), antiSunSide);
+        float antiSunSide = smoothstep(-0.08, 0.12, tTowardSun);
+        float penumbra = smoothstep(0.94, 1.06, perpDist);
+        float ringShadow = mix(1.0, mix(0.02, 1.0, penumbra), antiSunSide);
 
-        vec3 icyRing = mix(vec3(0.84, 0.74, 0.65), vec3(0.90, 0.92, 0.97), rNorm * 0.65);
-        float forwardPhase = 0.78 + 0.34 * safePow(max(0.0, dot(rayDir, uSunDir)), 3.0);
-        vec3 spaceSun = mix(vec3(1.0, 0.95, 0.88), uSunColor, 0.34);
+        vec3 icyRing = mix(vec3(0.90, 0.78, 0.64), vec3(0.94, 0.95, 1.0), rNorm * 0.65);
+        float forwardPhase = 0.82 + 0.36 * safePow(max(0.0, dot(rayDir, sunRay)), 3.0);
+        vec3 spaceSun = mix(vec3(1.0, 0.95, 0.88), uSunColor, 0.28);
         float moonSunAng = acos(clamp(dot(uMoonKrellnDir, uSunDir), -0.99999, 0.99999));
         float eclipseMode = smoothstep(0.072, 0.014, moonSunAng) * smoothstep(0.08, 0.38, uEclipse);
         float dayRing = smoothstep(-0.08, 0.22, uSunDir.y) * (1.0 - eclipseMode);
-        float ringBrightness = mix(0.16, 0.36, dayRing);
+        float noonGlareAtten = smoothstep(0.18, 0.56, uSunDir.y);
+        float ringBrightness = mix(0.52, 0.44, dayRing) * mix(1.0, 0.14, noonGlareAtten);
         vec3 ringRadiance = icyRing * spaceSun * ringShadow * forwardPhase * ringBrightness;
 
         vec3 col = skyForeground + ringRadiance * transmittance;
-        gl_FragColor = vec4(col, opticalDepth);
+        gl_FragColor = vec4(col, opticalDepth * mix(0.18, 1.0, ringShadow));
       }
     `
   });
@@ -1154,9 +1186,8 @@ function createEclipseCoronaShader() {
       varying vec3 vBasisX;
       varying vec3 vBasisY;
 
-      // Delicate gossamer solar magnetic dipole streamer wing:
-      // Smooth curved dipole centerline curving gently toward solar equator, with broad soft-feathered gaussian profile
-      // (no sharp pinched neon noodles or dark isolated gaps between forks)
+      // Druckmüller-inspired solar magnetic dipole helmet streamer:
+      // Broad closed magnetic-loop dome cavity at the solar limb pinching smoothly into a curved gossamer cusp stalk
       float evalHelmetWing(
         float theta,
         float rhoMoon,
@@ -1177,35 +1208,39 @@ function createEclipseCoronaShader() {
         float dA = atan(sin(theta - cAng), cos(theta - cAng));
 
         float halfW = mix(wTail, wBase, exp(-dR * pinchRate));
-        float psi = dA / max(halfW, 0.06);
-        float envCore = exp(-sq(psi * 1.15));
-        float envVeil = exp(-sq(psi * 0.56)) * 0.36;
-        float env = envCore + envVeil;
+        float minNyq = max(0.032, (pxInR * 1.5) / max(rhoMoon, 1.0));
+        float effW = max(halfW, minNyq);
+        float psi = dA / effW;
+        // Hybrid Lorentzian-Gaussian cusp profile: bulbous base, pinched silky outer streamer sheet
+        float cuspFactor = smoothstep(0.25, 1.45, dR);
+        float gaussEnv = exp(-sq(psi * 1.18)) + exp(-sq(psi * 0.54)) * 0.30;
+        float cuspEnv = 1.0 / (1.0 + sq(psi * 1.45)) * exp(-sq(psi * 0.42));
+        float env = mix(gaussEnv, cuspEnv * 1.15, cuspFactor);
         if (env < 0.002) {
           domeMask = 0.0;
           return 0.0;
         }
 
-        // Subtle arched base helmet density modulation (soft translucent plasma depth, zero hard carved black channels)
-        float domeZone = exp(-sq(dR / 0.72));
-        float archRipple = 1.0 - 0.14 * exp(-sq(psi / 0.50)) * exp(-sq((dR - 0.14) / 0.24));
+        // Closed magnetic-loop prominence cavity inside helmet base (authentic subtle darker inner arch)
+        float domeZone = exp(-sq(dR / 0.68));
+        float archCavity = 1.0 - 0.28 * exp(-sq(psi / 0.46)) * exp(-sq((dR - 0.16) / 0.22));
+        float archRim = 0.22 * exp(-sq((abs(psi) - 0.58) / 0.22)) * exp(-sq((dR - 0.22) / 0.30));
 
-        // Feathery multi-strand plasma wisps flowing smoothly along curved streamline coordinates
-        float sCurve = log(1.0 + dR * 1.15);
-        float nyq4 = exp(-sq(4.8 * pxInR / max(halfW * rhoMoon, 0.04)));
-        float filStream = fbm2(vec2(sCurve * 0.48 + seed * 3.7, psi * 3.6 + seed * 1.3));
-        float filFine = fbm2(vec2(sCurve * 0.72 - seed * 2.1, psi * 7.2 - seed * 1.7));
-        float wisp = mix(0.62, 1.20, smoothstep(0.24, 0.76, filStream))
-                   * mix(0.80, 1.16, mix(0.5, filFine, nyq4));
-        // Maintain delicate gossamer radial filamentation into the outer streamer wings
-        float farSilk = mix(wisp, mix(0.74, 1.16, smoothstep(0.26, 0.74, filStream)), smoothstep(1.4, 3.6, dR));
+        // Fine curved magnetic field striations flowing along streamline coordinates
+        float sCurve = log(1.0 + dR * 1.25);
+        float nyq4 = exp(-sq(4.2 * pxInR / max(effW * rhoMoon, 0.04)));
+        float filStream = fbm2(vec2(sCurve * 0.52 + seed * 3.7, psi * 3.2 + seed * 1.3));
+        float filFine = fbm2(vec2(sCurve * 0.78 - seed * 2.1, psi * 6.4 - seed * 1.7));
+        float wisp = mix(0.68, 1.24, smoothstep(0.22, 0.78, filStream))
+                   * mix(0.82, 1.18, mix(0.5, filFine, nyq4));
+        float farSilk = mix(wisp, mix(0.76, 1.18, smoothstep(0.26, 0.74, filStream)), smoothstep(1.5, 3.8, dR));
 
-        float softRoot = mix(0.45, 1.0, smoothstep(0.0, 0.10, dR));
-        float radEnv = exp(-dR * decayRate) / pow(1.0 + dR * 0.68, 1.45);
-        float farCutoff = 1.0 - smoothstep(2.6, 4.8, dR);
+        float softRoot = mix(0.52, 1.0, smoothstep(0.0, 0.08, dR));
+        float radEnv = exp(-dR * decayRate) / pow(1.0 + dR * 0.65, 1.38);
+        float farCutoff = 1.0 - smoothstep(2.8, 5.1, dR);
 
         domeMask = exp(-sq(psi * 0.85)) * exp(-dR * 1.05);
-        return env * archRipple * (1.0 + 0.16 * domeZone) * farSilk * softRoot * radEnv * farCutoff;
+        return (env * archCavity + archRim) * (1.0 + 0.18 * domeZone) * farSilk * softRoot * radEnv * farCutoff;
       }
 
       // Delicate curved hairline magnetic streamer ray arching outward from equatorial base into outer wings
@@ -1304,17 +1339,17 @@ function createEclipseCoronaShader() {
         float tilt = -0.26;
         float phi = atan(sin(theta - tilt), cos(theta - tilt));
 
-        // Asymmetric broad curved equatorial helmet wings + gossamer outer veil (natural feathery eclipse corona, zero whiskers)
+        // Asymmetric curved magnetic helmet streamers pinching from bulbous limb arches into graceful equatorial cusps
         float dWNW, dNW, dESE, dENE, dSW;
-        float wWNW = evalHelmetWing(theta, rhoMoon, dR,  2.72,  2.88, 0.85, 0.66, 0.22, 1.10, 0.68, 1.1, pxInR, dWNW) * 0.72;
-        float wNW  = evalHelmetWing(theta, rhoMoon, dR,  2.28,  2.66, 1.15, 0.48, 0.16, 1.25, 0.92, 2.7, pxInR, dNW)  * 0.46;
-        float wESE = evalHelmetWing(theta, rhoMoon, dR, -0.44, -0.22, 0.80, 0.70, 0.24, 1.05, 0.62, 4.3, pxInR, dESE) * 0.78;
-        float wENE = evalHelmetWing(theta, rhoMoon, dR,  0.34, -0.02, 1.10, 0.50, 0.17, 1.20, 0.88, 5.9, pxInR, dENE) * 0.48;
-        float wSW  = evalHelmetWing(theta, rhoMoon, dR, -2.42, -2.74, 1.20, 0.46, 0.15, 1.35, 1.05, 7.5, pxInR, dSW)  * 0.36;
+        float wWNW = evalHelmetWing(theta, rhoMoon, dR,  2.66,  2.88, 0.92, 0.56, 0.088, 1.28, 0.58, 1.1, pxInR, dWNW) * 0.84;
+        float wNW  = evalHelmetWing(theta, rhoMoon, dR,  2.14,  2.54, 1.18, 0.42, 0.068, 1.42, 0.82, 2.7, pxInR, dNW)  * 0.54;
+        float wESE = evalHelmetWing(theta, rhoMoon, dR, -0.48, -0.22, 0.88, 0.60, 0.095, 1.22, 0.54, 4.3, pxInR, dESE) * 0.88;
+        float wENE = evalHelmetWing(theta, rhoMoon, dR,  0.42,  0.04, 1.14, 0.44, 0.072, 1.38, 0.78, 5.9, pxInR, dENE) * 0.56;
+        float wSW  = evalHelmetWing(theta, rhoMoon, dR, -2.32, -2.68, 1.25, 0.40, 0.065, 1.48, 0.92, 7.5, pxInR, dSW)  * 0.46;
 
-        float westWing = wWNW * 0.85 + wNW * 0.48;
-        float eastWing = wESE * 0.88 + wENE * 0.48;
-        float helmetCorona = max(westWing, max(eastWing, wSW)) + 0.34 * min(westWing, eastWing) + wSW * 0.28;
+        float westWing = wWNW * 0.88 + wNW * 0.52;
+        float eastWing = wESE * 0.90 + wENE * 0.52;
+        float helmetCorona = max(westWing, max(eastWing, wSW)) + 0.30 * min(westWing, eastWing) + wSW * 0.28;
         float domeBelt = clamp(max(max(dWNW, dNW * 0.85), max(max(dESE, dENE * 0.85), dSW * 0.70)), 0.0, 1.0);
 
         // Multi-layered sweeping gossamer magnetic hairline rays arching from solar equator into asymmetric wings
@@ -1358,8 +1393,9 @@ function createEclipseCoronaShader() {
         float pVeilNoise = fbm2(vec2((fieldPsi + pWarp) * 4.4 + poleSign * 5.3, log(1.0 + dR * 1.3) * 1.1));
         float veilReach = mix(2.75, 1.65, smoothstep(0.32, 0.70, pVeilNoise));
         float polarMist = smoothstep(0.28, 0.78, pVeilNoise) * exp(-dR * veilReach) / (1.0 + dR * 1.25);
-        float polarSoftRoot = mix(0.40, 1.0, smoothstep(0.0, 0.11, dR));
-        float polarPlumes = polarMask * polarSoftRoot * (polarBrushes * 0.135 + polarMist * 0.068);
+        float polarSoftRoot = mix(0.45, 1.0, smoothstep(0.0, 0.12, dR));
+        // Silky gossamer dipole veil (suppress harsh straight radial brush-comb bristles!)
+        float polarPlumes = polarMask * polarSoftRoot * (polarBrushes * 0.036 + polarMist * 0.095);
 
         // Asymmetric inner streamer base glow + gossamer soft equatorial dust veil
         float innerSoft = mix(0.42, 1.0, smoothstep(0.0, 0.09, dR));
@@ -1368,13 +1404,13 @@ function createEclipseCoronaShader() {
         float gossamerVeil = exp(-dR * 0.95) * veilEq * 0.085 * innerSoft;
         float innerCorona = innerDecay * innerSoft * (0.09 + 0.34 * domeBelt) + gossamerVeil;
 
-        // Discrete localized warm pearl-pink H-alpha chromosphere prominences (zero 360-deg white/pink stroke)
-        float promNoise = 0.55 + 0.45 * vnoise2(vec2(cos(theta) * 10.0 + 1.3, sin(theta) * 10.0 - 0.8));
-        float prom1 = exp(-sq(atan(sin(theta - 2.52), cos(theta - 2.52)) / 0.068)) * exp(-sq(dR / 0.042)) * 0.95;
-        float prom2 = exp(-sq(atan(sin(theta - 0.36), cos(theta - 0.36)) / 0.055)) * exp(-sq(dR / 0.036)) * 0.78;
-        float prom3 = exp(-sq(atan(sin(theta + 0.62), cos(theta + 0.62)) / 0.072)) * exp(-sq(dR / 0.046)) * 0.88;
-        float prom4 = exp(-sq(atan(sin(theta + 2.22), cos(theta + 2.22)) / 0.048)) * exp(-sq(dR / 0.032)) * 0.64;
-        vec3 chromoGlow = vec3(1.18, 0.36, 0.54) * (prom1 + prom2 + prom3 + prom4) * promNoise * 0.62;
+        // Discrete localized ruby-magenta H-alpha solar loop prominences along the lunar limb
+        float promNoise = 0.52 + 0.48 * vnoise2(vec2(cos(theta) * 12.0 + 1.3, sin(theta) * 12.0 - 0.8));
+        float prom1 = exp(-sq(atan(sin(theta - 2.54), cos(theta - 2.54)) / 0.062)) * exp(-sq((dR - 0.012) / 0.038)) * 1.35;
+        float prom2 = exp(-sq(atan(sin(theta - 0.34), cos(theta - 0.34)) / 0.050)) * exp(-sq((dR - 0.008) / 0.032)) * 1.10;
+        float prom3 = exp(-sq(atan(sin(theta + 0.58), cos(theta + 0.58)) / 0.068)) * exp(-sq((dR - 0.014) / 0.044)) * 1.25;
+        float prom4 = exp(-sq(atan(sin(theta + 2.24), cos(theta + 2.24)) / 0.045)) * exp(-sq((dR - 0.008) / 0.028)) * 0.95;
+        vec3 chromoGlow = vec3(1.55, 0.28, 0.52) * (prom1 + prom2 + prom3 + prom4) * promNoise * 0.78;
 
         // Pinpoint diamond-ring glint strictly gated outside centered totality (moonSunAng >= 0.015)
         float dLen = length(uDiamondDir);
@@ -1401,7 +1437,7 @@ function createEclipseCoronaShader() {
         kCol = mix(kCol, outerSapphire, smoothstep(0.35, 2.8, dR));
 
         vec3 diamondCol = mix(vec3(1.18, 1.04, 0.80), vec3(1.48, 1.42, 1.30), exp(-dDiamond / (pxD * 2.6)));
-        float totalStructure = innerCorona + helmetCorona * 0.86 + hairlineRays + polarPlumes;
+        float totalStructure = innerCorona + helmetCorona * 0.94 + hairlineRays * 0.24 + polarPlumes;
         vec3 coronaRad = kCol * totalStructure + chromoGlow;
         vec3 col = coronaRad * outsideMask + diamondCol * diamondProminence;
 

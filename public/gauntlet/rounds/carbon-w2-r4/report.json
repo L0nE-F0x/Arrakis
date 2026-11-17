@@ -1,0 +1,76 @@
+{
+  "round": "carbon-w2-r4",
+  "suite": "wave2",
+  "resolution": "1280x720",
+  "errors": [],
+  "warnings": [],
+  "bench": {
+    "frames": 30,
+    "ms": 20,
+    "avgFrameMs": 0.65
+  },
+  "stats": [
+    {
+      "shot": "01_cistern_dawn",
+      "calls": 270,
+      "triangles": 6777297,
+      "tod": 6.25,
+      "weather": "calm"
+    },
+    {
+      "shot": "02_macro_flora",
+      "calls": 227,
+      "triangles": 6715493,
+      "tod": 7.4,
+      "weather": "calm"
+    },
+    {
+      "shot": "03_canopy_upward",
+      "calls": 113,
+      "triangles": 4468083,
+      "tod": 17.85,
+      "weather": "calm"
+    },
+    {
+      "shot": "04_erg_golden",
+      "calls": 123,
+      "triangles": 3732241,
+      "tod": 17.35,
+      "weather": "saltation"
+    },
+    {
+      "shot": "05_night_bloom",
+      "calls": 191,
+      "triangles": 4645313,
+      "tod": 23.2,
+      "weather": "calm"
+    }
+  ],
+  "images": [
+    {
+      "label": "Dew Cistern & Riparian Flora (Dawn)",
+      "url": "/gauntlet/rounds/carbon-w2-r4/01_cistern_dawn.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/carbon-w2-r4/01_cistern_dawn.png"
+    },
+    {
+      "label": "Macro Inkvine, Cacti & Agave",
+      "url": "/gauntlet/rounds/carbon-w2-r4/02_macro_flora.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/carbon-w2-r4/02_macro_flora.png"
+    },
+    {
+      "label": "Tamarisk Canopy & Twin Moons Upward Shot",
+      "url": "/gauntlet/rounds/carbon-w2-r4/03_canopy_upward.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/carbon-w2-r4/03_canopy_upward.png"
+    },
+    {
+      "label": "Erg Vista Past Blooming Ridge",
+      "url": "/gauntlet/rounds/carbon-w2-r4/04_erg_golden.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/carbon-w2-r4/04_erg_golden.png"
+    },
+    {
+      "label": "Twin-Moon Night & Dew Reflections",
+      "url": "/gauntlet/rounds/carbon-w2-r4/05_night_bloom.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/carbon-w2-r4/05_night_bloom.png"
+    }
+  ]
+}
