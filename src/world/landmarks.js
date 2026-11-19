@@ -707,7 +707,7 @@ function buildFremenCamp(worldState, colliders, interactables) {
     }
   });
 
-  function update(dt, state) {
+  function update(dt, state, camera = null) {
     const t = state.elapsed;
     clothUniforms.uTime.value = t;
     clothUniforms.uWindDir.value.copy(state.windDir);
@@ -719,6 +719,10 @@ function buildFremenCamp(worldState, colliders, interactables) {
     const nightFactor = 1.0 - smoothstep(-0.08, 0.20, state.sunDir.y);
     const flicker = 0.88 + 0.10 * Math.sin(t * 15.3) + 0.06 * Math.cos(t * 27.1);
     fireLight.intensity = (2.2 + nightFactor * 5.6 + state.eclipseStrength * 4.4) * flicker;
+    const maxLightDist = nightFactor > 0.35 || state.eclipseStrength > 0.25 ? 38.0 : 15.0;
+    fireLight.visible =
+      fireLight.intensity > 0.02 &&
+      (!camera || camera.position.distanceToSquared(worldBrazier) < maxLightDist * maxLightDist);
     coalMesh.material.emissiveIntensity = (1.05 + nightFactor * 0.92 + state.eclipseStrength * 0.65) * flicker;
 
     // Animate rising ember sparks
@@ -956,8 +960,9 @@ function buildDownedOrnithopter(colliders, interactables) {
   const cockpitConsoleMesh = new THREE.Mesh(mergeGeometries(consoleParts, false), cockpitGlintMat);
   wreck.add(cockpitConsoleMesh);
 
-  const cockpitLight = new THREE.PointLight(0xff8c28, 0.4, 4.8, 2.0);
+  const cockpitLight = new THREE.PointLight(0xff8c28, 0.0, 4.8, 2.0);
   cockpitLight.position.set(0.05, 0.78, 1.88);
+  cockpitLight.visible = false;
   wreck.add(cockpitLight);
 
   // Gleaming fractured obsidian-amber cockpit glass canopy (PMREM reflection + translucent interior amber glint!)
@@ -1176,6 +1181,7 @@ function buildDownedOrnithopter(colliders, interactables) {
 
   const beaconLight = new THREE.PointLight(0xff4c24, 0.0, 26.0, 1.7);
   beaconLight.position.set(0, 1.48, -1.72);
+  beaconLight.visible = false;
   wreck.add(beaconLight);
 
   // --- Wind-Scoured Eolian Sand-Drift Aprons Banking Smoothly Against Fuselage Nose & Skids ---
@@ -1187,13 +1193,14 @@ function buildDownedOrnithopter(colliders, interactables) {
   rightAxis.y = 0;
   rightAxis.normalize();
 
-  const apronGeo = new THREE.PlaneGeometry(14.5, 14.5, 52, 52);
+  const apronGeo = new THREE.PlaneGeometry(15.0, 15.0, 52, 52);
   apronGeo.rotateX(-Math.PI * 0.5);
   const aPos = apronGeo.attributes.position;
   const aCol = new Float32Array(aPos.count * 3);
-  const cSandBase = new THREE.Color(0xc28344);
-  const cSandCrest = new THREE.Color(0xdba05a);
-  const cSandShadow = new THREE.Color(0x8e5628);
+  // Linear RGB matching terrain.js Great Erg sand palette (sandMid / sandCrest / sandTrough) seamlessly!
+  const cSandBase = new THREE.Color().setRGB(0.64, 0.42, 0.205);
+  const cSandCrest = new THREE.Color().setRGB(0.80, 0.56, 0.295);
+  const cSandShadow = new THREE.Color().setRGB(0.46, 0.27, 0.125);
   const aTmp = new THREE.Color();
 
   for (let i = 0; i < aPos.count; i++) {
@@ -1208,38 +1215,38 @@ function buildDownedOrnithopter(colliders, interactables) {
     const v = lx * rightAxis.x + lz * rightAxis.z;
 
     // 1. Forward nose impact plow berm cradling chin turret & lower nose bevel (zero floating gap!)
-    const noseBerm = 0.84 * Math.exp(-Math.pow((u - 2.65) / 2.05, 2.0) - Math.pow((v + 0.15) / 2.15, 2.0));
+    const noseBerm = 0.74 * Math.exp(-Math.pow((u - 2.55) / 2.25, 2.0) - Math.pow((v + 0.15) / 2.45, 2.0));
     // 2. Port landing skid & strut wind-drift apron banking up smoothly around skidL_fwd & skidL_mid
-    const portSkidBank = 0.58 * Math.exp(-Math.pow((u - 1.35) / 2.45, 2.0) - Math.pow((v + 1.52) / 1.48, 2.0));
-    // 3. Starboard camera-facing fuselage flank & buried skid eolian ramp
-    const stbdFlankBank = 0.72 * Math.exp(-Math.pow((u - 0.15) / 3.45, 2.0) - Math.pow((v - 1.55) / 1.95, 2.0));
+    const portSkidBank = 0.56 * Math.exp(-Math.pow((u - 1.35) / 2.55, 2.0) - Math.pow((v + 1.52) / 1.65, 2.0));
+    // 3. Starboard camera-facing fuselage flank & buried skid smooth eolian ramp
+    const stbdFlankBank = 0.48 * Math.exp(-Math.pow((u - 0.10) / 3.65, 2.0) - Math.pow((v - 1.55) / 2.35, 2.0));
     // 4. Wind-swept side dune shoulder streaming downwind along starboard flank
-    const stbdDriftTail = 0.40 * Math.exp(-Math.pow((u + 1.65) / 2.85, 2.0) - Math.pow((v - 2.45) / 1.75, 2.0));
+    const stbdDriftTail = 0.28 * Math.exp(-Math.pow((u + 1.65) / 3.10, 2.0) - Math.pow((v - 2.55) / 2.15, 2.0));
     // 5. Leeward tail-boom sand tail blending the buried tail boom into the dune crest
-    const tailBank = 0.46 * Math.exp(-Math.pow((u + 3.95) / 3.25, 2.0) - Math.pow((v - 0.35) / 2.05, 2.0));
+    const tailBank = 0.38 * Math.exp(-Math.pow((u + 3.85) / 3.45, 2.0) - Math.pow((v - 0.35) / 2.35, 2.0));
 
     // Gentle natural wind-scour ripple modulation across the drift apron
     const windScour =
-      (Math.sin(u * 1.4 + v * 0.9) * 0.045 + Math.cos(u * 2.8 - v * 2.1) * 0.022) *
-      smoothstep(0.08, 0.55, noseBerm + portSkidBank + stbdFlankBank);
+      (Math.sin(u * 1.4 + v * 0.9) * 0.036 + Math.cos(u * 2.8 - v * 2.1) * 0.018) *
+      smoothstep(0.08, 0.50, noseBerm + portSkidBank + stbdFlankBank);
 
     // Keep port turbine nozzle (u ≈ -2.4, v ≈ -1.56) clearly exposed above the sand
-    const nozzleKeepClear = 1.0 - 0.72 * Math.exp(-Math.pow((u + 2.4) / 1.25, 2.0) - Math.pow((v + 1.55) / 1.15, 2.0));
+    const nozzleKeepClear = 1.0 - 0.76 * Math.exp(-Math.pow((u + 2.4) / 1.30, 2.0) - Math.pow((v + 1.55) / 1.20, 2.0));
 
     const radialDist = Math.hypot(lx, lz);
-    const edgeFade = 1.0 - smoothstep(4.6, 6.9, radialDist);
-    const rawDrift = Math.max(noseBerm, portSkidBank, stbdFlankBank, tailBank) + stbdDriftTail * 0.42;
+    const edgeFade = 1.0 - smoothstep(4.8, 7.2, radialDist);
+    const rawDrift = Math.max(noseBerm, portSkidBank, stbdFlankBank, tailBank) + stbdDriftTail * 0.36;
     const driftH = Math.max(0, (rawDrift * nozzleKeepClear + windScour) * edgeFade);
 
     // Tuck perimeter smoothly below dune surface so apron emerges seamlessly with zero visible edge seam
-    const edgeTuck = -0.10 * (1.0 - smoothstep(0.01, 0.14, driftH));
+    const edgeTuck = -0.10 * (1.0 - smoothstep(0.01, 0.16, driftH));
     aPos.setY(i, baseY + driftH + edgeTuck);
 
     // Match Great Erg dune sand palette (warm crest highlights + subtle shadow crease against hull)
     const hullCrease = Math.exp(-Math.pow((u - 0.4) / 3.6, 2.0) - Math.pow(v / 1.35, 2.0));
     aTmp.copy(cSandBase);
-    aTmp.lerp(cSandCrest, smoothstep(0.18, 0.72, driftH) * 0.45);
-    aTmp.lerp(cSandShadow, hullCrease * 0.24);
+    aTmp.lerp(cSandCrest, smoothstep(0.16, 0.68, driftH) * 0.42);
+    aTmp.lerp(cSandShadow, hullCrease * 0.20);
     aCol[i * 3] = aTmp.r;
     aCol[i * 3 + 1] = aTmp.g;
     aCol[i * 3 + 2] = aTmp.b;
@@ -1253,10 +1260,10 @@ function buildDownedOrnithopter(colliders, interactables) {
   const sandApronMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
-    roughness: 0.91,
+    roughness: 0.92,
     metalness: 0.0
   });
-  sandApronMat.customProgramCacheKey = () => 'arrakis-ornithopter-sand-apron-v1';
+  sandApronMat.customProgramCacheKey = () => 'arrakis-ornithopter-sand-apron-v2';
   sandApronMat.onBeforeCompile = (shader) => {
     shader.uniforms.uWindDir = apronUniforms.uWindDir;
     shader.vertexShader = shader.vertexShader
@@ -1274,7 +1281,7 @@ function buildDownedOrnithopter(colliders, interactables) {
         float meander = (fbm2(vec2(aAlong * 0.14, aCross * 0.22)) - 0.5) * 0.8;
         float rip = sin((aAlong + meander) * 20.5) * 0.5 + 0.5;
         float grain = vnoise2(vApronWorldPos.xz * 26.0) * 0.55 + vnoise2(vApronWorldPos.xz * 58.0) * 0.45;
-        diffuseColor.rgb *= (0.93 + 0.08 * rip + (grain - 0.5) * 0.09);`
+        diffuseColor.rgb *= (0.95 + 0.065 * rip + (grain - 0.5) * 0.08);`
       );
   };
   const sandApronMesh = new THREE.Mesh(apronGeo, sandApronMat);
@@ -1283,6 +1290,7 @@ function buildDownedOrnithopter(colliders, interactables) {
   sandApronMesh.receiveShadow = true;
   root.add(sandApronMesh);
 
+  const wreckWorldPos = new THREE.Vector3(ox, oy + 1.0, oz);
   colliders.push({ x: ox, z: oz, r: 3.4 });
   interactables.push({
     id: 'ornithopter_blackbox',
@@ -1301,26 +1309,34 @@ function buildDownedOrnithopter(colliders, interactables) {
     }
   });
 
-  function update(_dt, state) {
+  function update(_dt, state, camera = null) {
     const t = state.elapsed;
     ribbonUniforms.uTime.value = t;
     ribbonUniforms.uWindSpeed.value = state.windSpeed;
     apronUniforms.uWindDir.value.copy(state.windDir);
 
-    // Double-pulse distress beacon rhythm
+    // Double-pulse distress beacon rhythm + dynamic PointLight visibility gating
     const cycle = t % 2.4;
     const pulse =
       Math.exp(-Math.pow((cycle - 0.18) / 0.07, 2)) +
       Math.exp(-Math.pow((cycle - 0.42) / 0.08, 2)) * 0.72;
     beaconMat.emissiveIntensity = 0.25 + pulse * 5.2;
     beaconLight.intensity = pulse * 10.5;
+    beaconLight.visible =
+      beaconLight.intensity > 0.02 &&
+      (!camera || camera.position.distanceToSquared(wreckWorldPos) < 55.0 * 55.0);
 
-    // Subtle distress/instrument amber glint inside fractured cockpit canopy at dusk/night
+    // Subtle distress/instrument amber glint inside fractured cockpit canopy (PointLight gated off in bright daytime!)
     const duskNight = 1.0 - smoothstep(-0.08, 0.30, state.sunDir.y);
     const glintLvl = Math.min(1.0, duskNight + state.eclipseStrength * 0.85);
     const avionicsHum = 0.88 + 0.08 * Math.sin(t * 7.3) + 0.04 * Math.sin(t * 23.1);
-    cockpitGlintMat.emissiveIntensity = (0.35 + glintLvl * 1.95) * avionicsHum;
-    cockpitLight.intensity = (0.08 + glintLvl * 1.55) * avionicsHum;
+    cockpitGlintMat.emissiveIntensity = (0.55 + glintLvl * 1.95) * avionicsHum;
+
+    const nightCockpit = Math.min(1.0, (1.0 - smoothstep(-0.08, 0.06, state.sunDir.y)) + state.eclipseStrength * 0.85);
+    cockpitLight.intensity = nightCockpit > 0.02 ? nightCockpit * 1.65 * avionicsHum : 0.0;
+    cockpitLight.visible =
+      cockpitLight.intensity > 0.02 &&
+      (!camera || camera.position.distanceToSquared(wreckWorldPos) < 38.0 * 38.0);
 
     // Subtle wind shudder on intact skyward wings
     for (let i = 0; i < windWings.length; i++) {
@@ -1335,6 +1351,7 @@ function buildDownedOrnithopter(colliders, interactables) {
 
 // ============================================================================
 // 3. FREMEN QANAT TRAIL LANTERNS & DEW-COLLECTOR WIND HARPS
+//    Fully batched via mergeGeometries + dynamic PointLight visibility gating.
 // ============================================================================
 
 function buildLanternsAndHarps(colliders) {
@@ -1358,103 +1375,130 @@ function buildLanternsAndHarps(colliders) {
     roughness: 0.2
   });
 
+  const postParts = [];
+  const crownParts = [];
+  const coreParts = [];
   const lanternLights = [];
 
   for (let i = 0; i < lanternPositions.length; i++) {
     const lp = lanternPositions[i];
-    const gy = getGroundHeight(lp.x, lp.z);
-    const g = new THREE.Group();
-    g.position.set(lp.x, gy - 0.06, lp.z);
+    const gy = getGroundHeight(lp.x, lp.z) - 0.06;
 
     // Carved tapered basalt pedestal
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.12, 1.38, 6), basaltMat);
-    post.position.y = 0.69;
-    post.castShadow = true;
-    post.receiveShadow = true;
-    g.add(post);
+    const post = new THREE.CylinderGeometry(0.065, 0.12, 1.38, 6);
+    post.translate(lp.x, gy + 0.69, lp.z);
+    postParts.push(post.index ? post.toNonIndexed() : post);
 
-    // Pierced brass lantern crown
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.24, 6), brassMat);
-    cap.position.y = 1.66;
-    cap.castShadow = true;
-    g.add(cap);
+    // Pierced brass lantern crown & rim
+    const cap = new THREE.ConeGeometry(0.18, 0.24, 6);
+    cap.translate(lp.x, gy + 1.66, lp.z);
+    crownParts.push(cap.index ? cap.toNonIndexed() : cap);
 
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.10, 0.06, 6), brassMat);
-    rim.position.y = 1.38;
-    g.add(rim);
+    const rim = new THREE.CylinderGeometry(0.13, 0.10, 0.06, 6);
+    rim.translate(lp.x, gy + 1.38, lp.z);
+    crownParts.push(rim.index ? rim.toNonIndexed() : rim);
 
     // Warm flame/glowglobe bulb inside
-    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.095, 1), flameCoreMat);
-    core.position.y = 1.50;
-    g.add(core);
+    const core = new THREE.OctahedronGeometry(0.095, 1);
+    core.translate(lp.x, gy + 1.50, lp.z);
+    coreParts.push(core.index ? core.toNonIndexed() : core);
 
     // Real PointLights on alternate key lanterns so dusk/night trail pools with warm amber glow
     if (i === 0 || i === 2 || i === 4) {
       const pt = new THREE.PointLight(0xff9b48, 0, 14.0, 1.8);
-      pt.position.set(0, 1.56, 0);
-      g.add(pt);
-      lanternLights.push({ light: pt, phase: i * 2.1 });
+      const worldPos = new THREE.Vector3(lp.x, gy + 1.56, lp.z);
+      pt.position.copy(worldPos);
+      pt.visible = false;
+      root.add(pt);
+      lanternLights.push({ light: pt, phase: i * 2.1, worldPos });
     }
 
-    root.add(g);
     colliders.push({ x: lp.x, z: lp.z, r: 0.32 });
   }
 
-  // Dew-Collector Wind Harps along rocky canyon shoulders
+  const postsMesh = new THREE.Mesh(mergeGeometries(postParts, false), basaltMat);
+  postsMesh.castShadow = true;
+  postsMesh.receiveShadow = true;
+  root.add(postsMesh);
+
+  const crownsMesh = new THREE.Mesh(mergeGeometries(crownParts, false), brassMat);
+  crownsMesh.castShadow = true;
+  root.add(crownsMesh);
+
+  const coresMesh = new THREE.Mesh(mergeGeometries(coreParts, false), flameCoreMat);
+  root.add(coresMesh);
+
+  // Dew-Collector Wind Harps along rocky canyon shoulders (batched into 1 frame mesh + 1 net mesh!)
   const harpCoords = [
     { x: 11.6, z: 2.2, yaw: -0.4 },
     { x: 12.2, z: -5.2, yaw: -0.7 },
     { x: 10.8, z: -12.4, yaw: -0.2 },
     { x: -11.4, z: 15.2, yaw: 0.6 }
   ];
-  const harpParts = [];
+  const harpFrameParts = [];
+  const harpNetParts = [];
   for (const hc of harpCoords) {
-    const gy = getGroundHeight(hc.x, hc.z);
+    const gy = getGroundHeight(hc.x, hc.z) - 0.1;
+
     const frameL = new THREE.CylinderGeometry(0.025, 0.035, 3.1, 6);
     frameL.rotateZ(0.10);
     frameL.translate(-0.42, 1.48, 0);
+    frameL.rotateY(hc.yaw);
+    frameL.translate(hc.x, gy, hc.z);
+    harpFrameParts.push(colorize(frameL, 0x8e6b40));
+
     const frameR = new THREE.CylinderGeometry(0.025, 0.035, 3.1, 6);
     frameR.rotateZ(-0.10);
     frameR.translate(0.42, 1.48, 0);
+    frameR.rotateY(hc.yaw);
+    frameR.translate(hc.x, gy, hc.z);
+    harpFrameParts.push(colorize(frameR, 0x8e6b40));
+
     const barTop = new THREE.CylinderGeometry(0.022, 0.022, 0.62, 6);
     barTop.rotateZ(Math.PI * 0.5);
     barTop.translate(0, 2.95, 0);
+    barTop.rotateY(hc.yaw);
+    barTop.translate(hc.x, gy, hc.z);
+    harpFrameParts.push(colorize(barTop, 0xb88c52));
 
-    const meshGroup = new THREE.Group();
-    meshGroup.position.set(hc.x, gy - 0.1, hc.z);
-    meshGroup.rotation.y = hc.yaw;
-    const frameMesh = new THREE.Mesh(
-      mergeGeometries([colorize(frameL, 0x8e6b40), colorize(frameR, 0x8e6b40), colorize(barTop, 0xb88c52)], false),
-      brassMat
-    );
-    frameMesh.castShadow = true;
-    meshGroup.add(frameMesh);
-
-    // Translucent fine condensation mesh screen catching dawn glint
-    const net = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.68, 2.35),
-      new THREE.MeshPhysicalMaterial({
-        color: 0xdbe6ef,
-        roughness: 0.25,
-        metalness: 0.35,
-        transparent: true,
-        opacity: 0.26,
-        side: THREE.DoubleSide
-      })
-    );
-    net.position.y = 1.65;
-    meshGroup.add(net);
-    root.add(meshGroup);
+    const netGeo = new THREE.PlaneGeometry(0.68, 2.35);
+    netGeo.translate(0, 1.65, 0);
+    netGeo.rotateY(hc.yaw);
+    netGeo.translate(hc.x, gy, hc.z);
+    harpNetParts.push(netGeo.index ? netGeo.toNonIndexed() : netGeo);
   }
 
-  function update(_dt, state) {
+  const harpFrameMesh = new THREE.Mesh(
+    mergeGeometries(harpFrameParts, false),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.38, metalness: 0.78 })
+  );
+  harpFrameMesh.castShadow = true;
+  root.add(harpFrameMesh);
+
+  const harpNetMesh = new THREE.Mesh(
+    mergeGeometries(harpNetParts, false),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xdbe6ef,
+      roughness: 0.25,
+      metalness: 0.35,
+      transparent: true,
+      opacity: 0.26,
+      side: THREE.DoubleSide
+    })
+  );
+  root.add(harpNetMesh);
+
+  function update(_dt, state, camera = null) {
     const t = state.elapsed;
-    const nightAmt = Math.max(1.0 - smoothstep(-0.08, 0.16, state.sunDir.y), state.eclipseStrength * 0.85);
+    const nightAmt = Math.max(1.0 - smoothstep(-0.10, 0.08, state.sunDir.y), state.eclipseStrength * 0.85);
     flameCoreMat.emissiveIntensity = 0.08 + nightAmt * 2.85;
     for (let i = 0; i < lanternLights.length; i++) {
       const l = lanternLights[i];
       const flk = 0.90 + 0.10 * Math.sin(t * 11.4 + l.phase);
       l.light.intensity = nightAmt * 6.2 * flk;
+      l.light.visible =
+        l.light.intensity > 0.02 &&
+        (!camera || camera.position.distanceToSquared(l.worldPos) < 42.0 * 42.0);
     }
   }
 
@@ -1463,6 +1507,7 @@ function buildLanternsAndHarps(colliders) {
 
 // ============================================================================
 // 4. HARVESTABLE MÉLANGE SPICE SEAMS
+//    Batched crystal veins per node + Hero Pre-Spice Blow Crater rim crust.
 // ============================================================================
 
 function buildSpiceNodes(interactables) {
@@ -1472,50 +1517,119 @@ function buildSpiceNodes(interactables) {
   const nodeDefs = [
     { id: 'spice_ridge', x: 8.8, z: -31.5, name: 'Erg Margin Spice Seam', landmarkId: null },
     { id: 'spice_east', x: 15.2, z: -45.5, name: 'Leeward Slipface Mélange', landmarkId: null },
-    { id: 'spice_wreck', x: 22.0, z: -50.8, name: 'Scattered Cargo Mélange', landmarkId: 'ornithopter' },
+    { id: 'spice_wreck', x: 24.2, z: -52.2, name: 'Scattered Cargo Mélange', landmarkId: 'ornithopter' },
     { id: 'spice_mid', x: -14.5, z: -51.5, name: 'Deep Trough Cinnamon Vein', landmarkId: null },
     { id: 'spice_crater', x: -21.0, z: -68.0, name: 'Pre-Spice Blow Core', landmarkId: 'spice' }
   ];
 
   const nodes = [];
-  const crystalGeo = new THREE.OctahedronGeometry(0.18, 0);
-  crystalGeo.scale(1.0, 0.35, 1.0);
+  const rand = mulberry32(4219);
+  const _unitScale = new THREE.Vector3(1, 1, 1);
+  const _harvestScale = new THREE.Vector3(0.25, 0.25, 0.25);
 
   for (let i = 0; i < nodeDefs.length; i++) {
     const def = nodeDefs[i];
+    const isCrater = def.id === 'spice_crater';
     const gy = getGroundHeight(def.x, def.z);
     const gNorm = getGroundNormal(def.x, def.z, new THREE.Vector3());
 
     const g = new THREE.Group();
-    g.position.set(def.x, gy + 0.03, def.z);
-    g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), gNorm);
+    if (isCrater) {
+      // Hero crater stays world-aligned at (def.x, gy, def.z) so every rim crystal & vein conforms directly to crater terrain!
+      g.position.set(def.x, gy, def.z);
+    } else {
+      g.position.set(def.x, gy + 0.02, def.z);
+      g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), gNorm);
+    }
 
-    // Natural wind-feathered cinnamon-ochre spice deposit with delicate sparkling blue-gold glints (zero flat ring!)
+    // Natural cinnamon-amber mélange mineral veins (hero crater adds cobalt-blue mélange shimmer!)
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x8e3814,
-      emissive: new THREE.Color(0x2e64b8),
-      emissiveIntensity: 0.22,
-      roughness: 0.55,
-      metalness: 0.18
+      color: isCrater ? 0xffffff : 0x7a2e10,
+      vertexColors: isCrater,
+      emissive: new THREE.Color(isCrater ? 0x6c3214 : 0x9e4214),
+      emissiveIntensity: isCrater ? 0.34 : 0.10,
+      roughness: isCrater ? 0.44 : 0.62,
+      metalness: isCrater ? 0.26 : 0.12
     });
 
-    const cluster = new THREE.Group();
-    for (let k = 0; k < 9; k++) {
-      const m = new THREE.Mesh(crystalGeo, mat);
-      const a = (k / 9) * Math.PI * 2 + i * 1.3;
-      const r = k === 0 ? 0.05 : 0.22 + (k % 3) * 0.26;
-      m.position.set(Math.cos(a) * r, -0.015, Math.sin(a) * r);
-      m.rotation.set((k % 2) * 0.18, a, 0.10);
-      m.scale.setScalar(k === 0 ? 1.15 : 0.45 + (k % 3) * 0.18);
-      cluster.add(m);
+    const shardParts = [];
+    if (isCrater) {
+      // Inner deposit shards + outer concentric crater-rim mélange crystal crust (r = 3.2..6.8m outside central geyser!)
+      const cCinn = new THREE.Color(0x883210);
+      const cAmber = new THREE.Color(0xc46020);
+      const cIbad = new THREE.Color(0x3a72c8);
+      const tmpC = new THREE.Color();
+
+      const rimCount = 34;
+      for (let k = 0; k < rimCount; k++) {
+        const ring = k < 10 ? 0 : k < 24 ? 1 : 2;
+        const a =
+          ring === 0
+            ? (k / 10) * Math.PI * 2 + 0.15
+            : ring === 1
+              ? ((k - 10) / 14) * Math.PI * 2 + 0.32
+              : ((k - 24) / 10) * Math.PI * 2 + 0.68;
+        const r =
+          ring === 0
+            ? 3.1 + rand() * 0.95
+            : ring === 1
+              ? 4.2 + rand() * 1.45
+              : 5.5 + rand() * 1.45;
+        const lx = Math.cos(a) * r;
+        const lz = Math.sin(a) * r;
+        const ly = getGroundHeight(def.x + lx, def.z + lz) - gy;
+
+        // Multi-crystal cluster per rim seam (2-3 clustered tilted mineral prisms)
+        const subCount = ring === 1 ? 3 : 2;
+        for (let s = 0; s < subCount; s++) {
+          const sx = lx + (rand() - 0.5) * 0.55;
+          const sz = lz + (rand() - 0.5) * 0.55;
+          const sy = getGroundHeight(def.x + sx, def.z + sz) - gy;
+          const rad = (s === 0 ? 0.32 : 0.20) + rand() * 0.24;
+          const hScale = (s === 0 ? 0.48 : 0.36) + rand() * 0.28;
+          const shard = new THREE.OctahedronGeometry(rad, 0);
+          shard.scale(1.15, hScale, 0.85);
+          shard.rotateX((rand() - 0.5) * 0.45);
+          shard.rotateY(a + s * 1.1);
+          shard.rotateZ((rand() - 0.5) * 0.42);
+          // Rich burnt-cinnamon base with subtle amber & rare Ibad-blue mineral tip glint
+          const isBlueVein = (k + s) % 5 === 0;
+          const coloredShard = colorizeByFn(shard, (_px, py, _pz, outC) => {
+            const tip = smoothstep(-rad * 0.1, rad * hScale * 0.85, py);
+            tmpC.copy(cCinn).lerp(isBlueVein ? cIbad : cAmber, tip * (isBlueVein ? 0.68 : 0.74));
+            outC.copy(tmpC);
+          });
+          coloredShard.translate(sx, sy + rad * hScale * 0.25, sz);
+          shardParts.push(coloredShard);
+        }
+      }
+    } else {
+      // Compact natural flattened cinnamon-amber mineral cluster merged into 1 draw call
+      for (let k = 0; k < 9; k++) {
+        const shard = new THREE.OctahedronGeometry(0.15, 0);
+        shard.scale(1.0, 0.24, 0.88);
+        const a = (k / 9) * Math.PI * 2 + i * 1.3;
+        const r = k === 0 ? 0.04 : 0.20 + (k % 3) * 0.24;
+        const sc = k === 0 ? 1.08 : 0.42 + (k % 3) * 0.17;
+        shard.scale(sc, sc, sc);
+        shard.rotateX((k % 2) * 0.16);
+        shard.rotateY(a);
+        shard.rotateZ(0.08);
+        shard.translate(Math.cos(a) * r, -0.01, Math.sin(a) * r);
+        shardParts.push(shard.index ? shard.toNonIndexed() : shard);
+      }
     }
+
+    const cluster = new THREE.Mesh(mergeGeometries(shardParts, false), mat);
+    cluster.receiveShadow = true;
     g.add(cluster);
 
-    // Organic feathered wind-drifted spice stain & subtle atmospheric shimmer (zero hard disc edge!)
+    // Organic feathered wind-drifted spice stain & shimmer (terrain-conforming wide rim stain for hero crater!)
     const haloUniforms = {
       uTime: { value: 0 },
-      uStrength: { value: 0.4 },
-      uSeed: { value: i * 4.3 + 1.2 }
+      uStrength: { value: isCrater ? 0.92 : 0.42 },
+      uSeed: { value: i * 4.3 + 1.2 },
+      uIsCrater: { value: isCrater ? 1.0 : 0.0 }
     };
     const haloMat = new THREE.ShaderMaterial({
       transparent: true,
@@ -1533,33 +1647,56 @@ function buildSpiceNodes(interactables) {
         uniform float uTime;
         uniform float uStrength;
         uniform float uSeed;
+        uniform float uIsCrater;
         varying vec2 vUv;
         void main() {
           vec2 p = (vUv - 0.5) * 2.0;
           float r = length(p);
           if (r > 1.0) discard;
-          float n = fbm2(p * 2.6 + vec2(uSeed, -uTime * 0.12));
-          float mask = smoothstep(0.95, 0.15, r + (n - 0.5) * 0.55);
-          float spark = pow(vnoise2(p * 18.0 + uSeed) * vnoise2(p.yx * 26.0 - uSeed), 5.0);
-          float twinkle = 0.55 + 0.45 * sin(uTime * 4.2 + n * 18.0);
-          vec3 cinnamon = vec3(0.56, 0.20, 0.06);
-          vec3 sparkBlue = vec3(0.35, 0.78, 1.35) * spark * twinkle * 5.2;
-          vec3 col = cinnamon + sparkBlue;
-          float alpha = mask * (0.48 + spark * 0.65) * uStrength;
+          float n = fbm2(p * (uIsCrater > 0.5 ? 3.8 : 2.6) + vec2(uSeed, -uTime * 0.10));
+          float radialVein = fbm2(vec2(atan(p.y, p.x) * 3.0 + uSeed, r * 4.2 - uTime * 0.08));
+          float outerMask = smoothstep(0.96, 0.18, r + (n - 0.5) * 0.52);
+          float craterRim = uIsCrater > 0.5
+            ? smoothstep(0.24, 0.52, r + (n - 0.5) * 0.20) * (1.0 - smoothstep(0.68, 0.96, r + (radialVein - 0.5) * 0.24))
+            : 0.0;
+          float mask = max(outerMask * (uIsCrater > 0.5 ? 0.55 : 1.0), craterRim * 1.15);
+          float spark = pow(vnoise2(p * (uIsCrater > 0.5 ? 28.0 : 18.0) + uSeed) * vnoise2(p.yx * (uIsCrater > 0.5 ? 40.0 : 26.0) - uSeed), 5.0);
+          float twinkle = 0.58 + 0.42 * sin(uTime * 3.8 + n * 16.0);
+          vec3 cinnamon = mix(vec3(0.48, 0.17, 0.05), vec3(0.68, 0.25, 0.07), radialVein);
+          vec3 sparkAmber = vec3(1.15, 0.56, 0.16) * spark * twinkle * 2.8;
+          vec3 sparkIbad = vec3(0.32, 0.74, 1.38) * spark * twinkle * (uIsCrater > 0.5 ? 5.6 : 0.75);
+          vec3 col = cinnamon + sparkAmber + sparkIbad;
+          float alpha = mask * (0.44 + craterRim * 0.26 + spark * 0.55) * uStrength;
           if (alpha < 0.01) discard;
-          gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.72));
+          gl_FragColor = vec4(col, clamp(alpha, 0.0, uIsCrater > 0.5 ? 0.78 : 0.56));
         }
       `
     });
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), haloMat);
-    halo.rotation.x = -Math.PI * 0.5;
-    halo.position.y = 0.025;
+
+    let haloGeo;
+    if (isCrater) {
+      haloGeo = new THREE.PlaneGeometry(16.4, 16.4, 30, 30);
+      haloGeo.rotateX(-Math.PI * 0.5);
+      const hp = haloGeo.attributes.position;
+      for (let vi = 0; vi < hp.count; vi++) {
+        const hx = hp.getX(vi);
+        const hz = hp.getZ(vi);
+        hp.setY(vi, getGroundHeight(def.x + hx, def.z + hz) - gy + 0.045);
+      }
+      haloGeo.computeVertexNormals();
+    } else {
+      haloGeo = new THREE.PlaneGeometry(2.3, 2.3);
+      haloGeo.rotateX(-Math.PI * 0.5);
+      haloGeo.translate(0, 0.02, 0);
+    }
+    const halo = new THREE.Mesh(haloGeo, haloMat);
     g.add(halo);
 
     root.add(g);
 
     const nodeState = {
       def,
+      isCrater,
       group: g,
       cluster,
       mat,
@@ -1575,7 +1712,7 @@ function buildSpiceNodes(interactables) {
       type: 'spice',
       landmarkId: def.landmarkId,
       position: new THREE.Vector3(def.x, gy + 0.35, def.z),
-      radius: 3.4,
+      radius: isCrater ? 7.5 : 3.4,
       isAvailable: () => !nodeState.harvested,
       prompt: `[E] Harvest ${def.name}`,
       onInteract: (state, hooks) => {
@@ -1602,14 +1739,19 @@ function buildSpiceNodes(interactables) {
       n.haloUniforms.uTime.value = t;
       if (n.harvested) {
         n.regenTimer -= dt;
-        n.cluster.scale.lerp(new THREE.Vector3(0.25, 0.25, 0.25), Math.min(1, dt * 6));
+        n.cluster.scale.lerp(_harvestScale, Math.min(1, dt * 6));
         n.haloUniforms.uStrength.value = Math.max(0, n.haloUniforms.uStrength.value - dt * 1.2);
         if (n.regenTimer <= 0) n.harvested = false;
       } else {
-        n.cluster.scale.lerp(new THREE.Vector3(1, 1, 1), Math.min(1, dt * 2.5));
+        n.cluster.scale.lerp(_unitScale, Math.min(1, dt * 2.5));
         const pulse = 0.55 + 0.45 * Math.sin(t * 2.4 + i * 1.7);
-        n.mat.emissiveIntensity = 0.18 + pulse * 0.35 + state.spiceBlow.intensity * 0.45;
-        n.haloUniforms.uStrength.value = 0.78 + pulse * 0.22;
+        if (n.isCrater) {
+          n.mat.emissiveIntensity = 0.24 + pulse * 0.26 + state.spiceBlow.intensity * 0.42;
+          n.haloUniforms.uStrength.value = 0.85 + pulse * 0.15 + state.spiceBlow.intensity * 0.18;
+        } else {
+          n.mat.emissiveIntensity = 0.07 + pulse * 0.12 + state.spiceBlow.intensity * 0.28;
+          n.haloUniforms.uStrength.value = 0.46 + pulse * 0.14;
+        }
       }
     }
   }
@@ -1654,8 +1796,8 @@ function buildLivingMicroWorld() {
   thopter.scale.setScalar(1.35);
   root.add(thopter);
 
-  // --- B) 120 Nocturnal Bioluminescent Desert Moths / Spores over Cistern & Blooms ---
-  const MOTH_COUNT = 120;
+  // --- B) Delicate Nocturnal Bioluminescent Spores / Moths Strictly Over Cistern Water & Reeds ---
+  const MOTH_COUNT = 84;
   const mothPos = new Float32Array(MOTH_COUNT * 3);
   const mothCol = new Float32Array(MOTH_COUNT * 3);
   const mothSeeds = [];
@@ -1667,11 +1809,11 @@ function buildLivingMicroWorld() {
 
   for (let i = 0; i < MOTH_COUNT; i++) {
     const a = rand() * Math.PI * 2;
-    const r = 1.6 + rand() * 11.5;
+    const r = 1.5 + rand() * 4.3; // Constrained tightly to r = 1.5..5.8m cistern & reed margin!
     const bx = CISTERN_CENTER.x + Math.cos(a) * r;
     const bz = CISTERN_CENTER.z + Math.sin(a) * r;
-    const by = Math.max(WATER_LEVEL + 0.22, getGroundHeight(bx, bz) + 0.35) + rand() * 2.4;
-    mothSeeds.push({ bx, by, bz, sp: 0.6 + rand() * 1.1, ph: rand() * Math.PI * 2, rad: 0.35 + rand() * 0.75 });
+    const by = WATER_LEVEL + 0.18 + rand() * 0.77; // Low over water & reeds (0.18..0.95m), never in sky or camp!
+    mothSeeds.push({ bx, by, bz, sp: 0.55 + rand() * 0.95, ph: rand() * Math.PI * 2, rad: 0.18 + rand() * 0.36 });
     mothPos[i * 3] = bx;
     mothPos[i * 3 + 1] = by;
     mothPos[i * 3 + 2] = bz;
@@ -1687,7 +1829,7 @@ function buildLivingMicroWorld() {
   mothGeo.setAttribute('position', new THREE.BufferAttribute(mothPos, 3));
   mothGeo.setAttribute('color', new THREE.BufferAttribute(mothCol, 3));
   const mothMat = new THREE.PointsMaterial({
-    size: 0.16,
+    size: 0.055,
     map: getSoftGlowTexture(),
     vertexColors: true,
     transparent: true,
@@ -1750,16 +1892,16 @@ function buildLivingMicroWorld() {
       }
     }
 
-    // 2. Nocturnal bioluminescent moths/spores
-    const nightVis = (1.0 - smoothstep(-0.08, 0.10, state.sunDir.y)) * (1.0 - stormHide * 0.85);
+    // 2. Nocturnal bioluminescent moths/spores (strictly deep night over cistern water, hidden at dusk!)
+    const nightVis = (1.0 - smoothstep(-0.26, -0.13, state.sunDir.y)) * (1.0 - stormHide * 0.85);
     mothPoints.visible = nightVis > 0.02;
     if (mothPoints.visible) {
-      mothMat.opacity = nightVis * 0.82;
+      mothMat.opacity = nightVis * 0.68;
       const arr = mothGeo.attributes.position.array;
       for (let i = 0; i < MOTH_COUNT; i++) {
         const s = mothSeeds[i];
         arr[i * 3] = s.bx + Math.sin(t * s.sp + s.ph) * s.rad;
-        arr[i * 3 + 1] = s.by + Math.sin(t * s.sp * 1.4 + s.ph) * 0.28;
+        arr[i * 3 + 1] = s.by + Math.sin(t * s.sp * 1.4 + s.ph) * 0.14;
         arr[i * 3 + 2] = s.bz + Math.cos(t * s.sp * 0.9 + s.ph) * s.rad;
       }
       mothGeo.attributes.position.needsUpdate = true;
@@ -1873,11 +2015,11 @@ export function createLandmarksSystem(scene, worldState) {
 
   if (scene) scene.add(group);
 
-  function update(dt) {
+  function update(dt, camera = null) {
     if (!worldState) return;
-    camp.update(dt, worldState);
-    ornithopter.update(dt, worldState);
-    lanterns.update(dt, worldState);
+    camp.update(dt, worldState, camera);
+    ornithopter.update(dt, worldState, camera);
+    lanterns.update(dt, worldState, camera);
     spiceNodes.update(dt, worldState);
     microWorld.update(dt, worldState);
   }
