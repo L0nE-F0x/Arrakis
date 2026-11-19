@@ -1,0 +1,128 @@
+{
+  "round": "swarm-w3-reg",
+  "suite": "wave3",
+  "resolution": "1280x720",
+  "errors": [],
+  "warnings": [],
+  "bench": {
+    "frames": 30,
+    "ms": 372,
+    "avgFrameMs": 12.4
+  },
+  "stats": [
+    {
+      "shot": "01_cistern_dawn",
+      "calls": 396,
+      "triangles": 7204617,
+      "tod": 6.28,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "cistern"
+    },
+    {
+      "shot": "02_macro_muaddib",
+      "calls": 304,
+      "triangles": 7145141,
+      "tod": 7.6,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "muaddib"
+    },
+    {
+      "shot": "03_canopy_sky",
+      "calls": 221,
+      "triangles": 6993813,
+      "tod": 17.75,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "canopy"
+    },
+    {
+      "shot": "04_worm_breach",
+      "calls": 196,
+      "triangles": 4057609,
+      "tod": 17.4,
+      "weather": "saltation",
+      "quality": "ultra",
+      "mode": "worm"
+    },
+    {
+      "shot": "05_coriolis_storm",
+      "calls": 140,
+      "triangles": 3439939,
+      "tod": 16.2,
+      "weather": "coriolisStorm",
+      "quality": "ultra",
+      "mode": "ridge"
+    },
+    {
+      "shot": "06_spice_blow",
+      "calls": 153,
+      "triangles": 3952273,
+      "tod": 13.4,
+      "weather": "spiceBlow",
+      "quality": "ultra",
+      "mode": "spice"
+    },
+    {
+      "shot": "07_night_moons",
+      "calls": 283,
+      "triangles": 4931279,
+      "tod": 23.3,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "nightCistern"
+    },
+    {
+      "shot": "08_hud_overview",
+      "calls": 402,
+      "triangles": 7223049,
+      "tod": 6.45,
+      "weather": "dustDevil",
+      "quality": "ultra",
+      "mode": "director"
+    }
+  ],
+  "images": [
+    {
+      "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+      "url": "/gauntlet/rounds/swarm-w3-reg/01_cistern_dawn.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/01_cistern_dawn.png"
+    },
+    {
+      "label": "Macro MuadDib Foraging by Desert Flora",
+      "url": "/gauntlet/rounds/swarm-w3-reg/02_macro_muaddib.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/02_macro_muaddib.png"
+    },
+    {
+      "label": "Tamarisk Canopy & Canopus/Krelln",
+      "url": "/gauntlet/rounds/swarm-w3-reg/03_canopy_sky.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/03_canopy_sky.png"
+    },
+    {
+      "label": "Shai-Hulud Sandworm Breach Across Erg",
+      "url": "/gauntlet/rounds/swarm-w3-reg/04_worm_breach.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/04_worm_breach.png"
+    },
+    {
+      "label": "Coriolis Haboob Storm Wall & Static Flash",
+      "url": "/gauntlet/rounds/swarm-w3-reg/05_coriolis_storm.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/05_coriolis_storm.png"
+    },
+    {
+      "label": "Mélange Spice Blow & Dust Devils",
+      "url": "/gauntlet/rounds/swarm-w3-reg/06_spice_blow.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/06_spice_blow.png"
+    },
+    {
+      "label": "Twin-Moon Night & Starlight Reflection",
+      "url": "/gauntlet/rounds/swarm-w3-reg/07_night_moons.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/07_night_moons.png"
+    },
+    {
+      "label": "Interactive HUD + Sunrise Panorama",
+      "url": "/gauntlet/rounds/swarm-w3-reg/08_hud_overview.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w3-reg/08_hud_overview.png"
+    }
+  ]
+}

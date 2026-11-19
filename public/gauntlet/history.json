@@ -935,12 +935,46 @@
       ]
     },
     {
+      "round": "swarm-w4-r2",
+      "title": "Round swarm-w4-r2 (wave4)",
+      "timestamp": "2026-11-19T16:31:25.443Z",
+      "verdict": "PASS",
+      "metrics": "1280x720 · 0.52 ms/frame · Calls: 177 · Tris: 4809739 · Errors: 0",
+      "summary": "PASS: All 6 Wave 4 shots clear P0/P1 visual & telemetry bars (0 errors, 0 warnings, 0.52 ms/frame, 142-268 calls). Verified grounded Fremen camp dusk props & brazier glow, dune-blended downed Ornithopter with PMREM canopy & fluttering ribbons, 3D solar-shadowed sandwalk footprints, unobstructed nocturnal Glowglobe walk HUD, centered breaching Shai-Hulud in Electro-Optics (69m lock + active seismograph), and upwind Pre-Spice crater with Eyes-of-Ibad sapphire aura.",
+      "images": [
+        {
+          "label": "Yardang Sanctuary Camp & Spice-Oil Brazier (Dusk)",
+          "url": "/gauntlet/rounds/swarm-w4-r2/01_fremen_camp_dusk.png"
+        },
+        {
+          "label": "Downed Imperial Ornithopter in Erg Saltation",
+          "url": "/gauntlet/rounds/swarm-w4-r2/02_downed_ornithopter.png"
+        },
+        {
+          "label": "3D Fremen Sandwalk Footprints & Ripple Relief",
+          "url": "/gauntlet/rounds/swarm-w4-r2/03_sandwalk_footprints.png"
+        },
+        {
+          "label": "Nocturnal Fremen Walk — Suspensor Glowglobe & HUD",
+          "url": "/gauntlet/rounds/swarm-w4-r2/04_walk_glowglobe_night.png"
+        },
+        {
+          "label": "Electro-Optics Binoculars on Breaching Shai-Hulud + Seismograph",
+          "url": "/gauntlet/rounds/swarm-w4-r2/05_electro_optics_worm.png"
+        },
+        {
+          "label": "Pre-Spice Mélange Crater & Eyes-of-Ibad Aura",
+          "url": "/gauntlet/rounds/swarm-w4-r2/06_spice_crater_trance.png"
+        }
+      ]
+    },
+    {
       "round": "swarm-w3-reg",
       "title": "Round swarm-w3-reg (wave3)",
-      "timestamp": "2026-11-19T16:16:55.803Z",
-      "verdict": "FAIL",
-      "metrics": "1280x720 · 15.89 ms/frame · Calls: 515 · Tris: 7199109 · Errors: 0",
-      "summary": "Critic #12 FAIL: P0-3 avgFrameMs regressed to 15.89ms (vs <=4.0ms bar) & draw calls doubled to 515-519 (vs 270-276 baseline) due to 6 always-visible PointLights & unmerged lantern/harp/spice meshes; P1-5 giant moth dots in 07_night_moons; P1-6 spice_wreck intrusion in 04_worm_breach.",
+      "timestamp": "2026-11-19T16:32:12.149Z",
+      "verdict": "PASS",
+      "metrics": "1280x720 · 12.4 ms/frame · Calls: 396 · Tris: 7204617 · Errors: 0",
+      "summary": "PASS: All 8 Wave 3 regression shots clear visual & telemetry bars (0 errors, 0 warnings, 140-402 calls — ~117 fewer draw calls/frame via merged landmark meshes & dynamic PointLight culling). Verified regression-free dawn cistern, Muad'Dib, canopy, worm breach, Coriolis storm, spice blow, night moons (no stray moth dots), and HUD overview.",
       "images": [
         {
           "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",

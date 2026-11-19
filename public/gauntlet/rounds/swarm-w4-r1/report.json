@@ -1,0 +1,100 @@
+{
+  "round": "swarm-w4-r1",
+  "suite": "wave4",
+  "resolution": "1280x720",
+  "errors": [],
+  "warnings": [],
+  "bench": {
+    "frames": 30,
+    "ms": 14,
+    "avgFrameMs": 0.45
+  },
+  "stats": [
+    {
+      "shot": "01_fremen_camp_dusk",
+      "calls": 176,
+      "triangles": 4804843,
+      "tod": 18.45,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "camp"
+    },
+    {
+      "shot": "02_downed_ornithopter",
+      "calls": 177,
+      "triangles": 3314853,
+      "tod": 17.35,
+      "weather": "saltation",
+      "quality": "ultra",
+      "mode": "ornithopter"
+    },
+    {
+      "shot": "03_sandwalk_footprints",
+      "calls": 180,
+      "triangles": 3971309,
+      "tod": 17.15,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "footprints"
+    },
+    {
+      "shot": "04_walk_glowglobe_night",
+      "calls": 237,
+      "triangles": 4877205,
+      "tod": 23.25,
+      "weather": "calm",
+      "quality": "ultra",
+      "mode": "walk"
+    },
+    {
+      "shot": "05_electro_optics_worm",
+      "calls": 164,
+      "triangles": 4026457,
+      "tod": 17.4,
+      "weather": "saltation",
+      "quality": "ultra",
+      "mode": "walk"
+    },
+    {
+      "shot": "06_spice_crater_trance",
+      "calls": 141,
+      "triangles": 2897819,
+      "tod": 16.85,
+      "weather": "spiceBlow",
+      "quality": "ultra",
+      "mode": "spiceCrater"
+    }
+  ],
+  "images": [
+    {
+      "label": "Yardang Sanctuary Camp & Spice-Oil Brazier (Dusk)",
+      "url": "/gauntlet/rounds/swarm-w4-r1/01_fremen_camp_dusk.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w4-r1/01_fremen_camp_dusk.png"
+    },
+    {
+      "label": "Downed Imperial Ornithopter in Erg Saltation",
+      "url": "/gauntlet/rounds/swarm-w4-r1/02_downed_ornithopter.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w4-r1/02_downed_ornithopter.png"
+    },
+    {
+      "label": "3D Fremen Sandwalk Footprints & Ripple Relief",
+      "url": "/gauntlet/rounds/swarm-w4-r1/03_sandwalk_footprints.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w4-r1/03_sandwalk_footprints.png"
+    },
+    {
+      "label": "Nocturnal Fremen Walk — Suspensor Glowglobe & HUD",
+      "url": "/gauntlet/rounds/swarm-w4-r1/04_walk_glowglobe_night.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w4-r1/04_walk_glowglobe_night.png"
+    },
+    {
+      "label": "Electro-Optics Binoculars on Breaching Shai-Hulud + Seismograph",
+      "url": "/gauntlet/rounds/swarm-w4-r1/05_electro_optics_worm.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w4-r1/05_electro_optics_worm.png"
+    },
+    {
+      "label": "Pre-Spice Mélange Crater & Eyes-of-Ibad Aura",
+      "url": "/gauntlet/rounds/swarm-w4-r1/06_spice_crater_trance.png",
+      "file": "/home/lonefox/Projects/Hydrogen Benchmark/public/gauntlet/rounds/swarm-w4-r1/06_spice_crater_trance.png"
+    }
+  ]
+}
