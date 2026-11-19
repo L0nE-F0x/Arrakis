@@ -149,14 +149,31 @@ const ArrakisAtmoShader = {
 
       // 5. Mélange Spice warmth + "Eyes of Ibad" Prescient Trance Rim Aura on harvest
       if (uSpice > 0.01) {
-        color = mix(color, color * vec3(1.045, 0.965, 0.945), uSpice * 0.45);
+        color = mix(color, color * vec3(1.045, 0.965, 0.945), uSpice * 0.45 * clamp(1.0 - uSpiceTrance * 0.78, 0.0, 1.0));
       }
       if (uSpiceTrance > 0.005) {
-        float edgeRing = smoothstep(0.22, 0.72, length(centered));
-        vec3 ibadBlue = vec3(0.22, 0.68, 1.25);
-        color += ibadBlue * edgeRing * uSpiceTrance * 0.14;
-        // Subtle contrast & clarity pop during spice trance
-        color = mix(color, color * vec3(1.04, 1.03, 1.09), uSpiceTrance * 0.35);
+        vec2 ibadCoord = centered * vec2(1.06, 0.96);
+        float ibadR = length(ibadCoord);
+        // Smooth radial iris aura (zero hard disc edges) leaving central aperture clear for crater & plume
+        float edgeRing = smoothstep(0.18, 0.62, ibadR);
+        float outerSclera = smoothstep(0.38, 0.72, ibadR);
+        float irisAng = atan(centered.y, centered.x);
+        float irisPulse = 0.94 + 0.06 * sin(irisAng * 7.0 + uTime * 0.85 + ibadR * 8.0)
+                                      * cos(irisAng * 5.0 - uTime * 0.6);
+
+        float tranceAmt = clamp(uSpiceTrance, 0.0, 1.0);
+        float tranceLuma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+
+        // Blue-within-blue Fremen Eyes-of-Ibad shift: luminous sapphire inner iris -> deep cobalt-indigo outer sclera
+        vec3 innerSapphire = color * vec3(0.26, 0.64, 1.48) + vec3(0.068, 0.26, 0.68);
+        vec3 deepIndigo = vec3(0.034, 0.13, 0.48) + tranceLuma * vec3(0.16, 0.45, 1.22);
+        vec3 ibadAura = mix(innerSapphire, deepIndigo, outerSclera * 0.64);
+
+        float auraMix = clamp(edgeRing * irisPulse * tranceAmt * 0.88, 0.0, 0.86);
+        color = mix(color, ibadAura, auraMix);
+
+        // Subtle prescient clarity & warm-vs-sapphire separation in the central viewport
+        color = mix(color, color * vec3(1.04, 1.03, 1.12), (1.0 - edgeRing * 0.65) * tranceAmt * 0.32);
       }
 
       // 6. Coriolis Storm Visor Sand-Lash Haze when walking exposed in storm
@@ -167,10 +184,10 @@ const ArrakisAtmoShader = {
         color = mix(color, gritCol, edgeSand * uStormExposure * (0.28 + 0.14 * streak));
       }
 
-      // 7. Subtle warm cinema vignette + Electro-Optics binocular dark border when zooming
+      // 7. Subtle warm cinema vignette (suppressed during Eyes-of-Ibad spice trance) + Electro-Optics dark border
       vec2 vigCoord = centered * vec2(1.0, 0.88);
       float vigDist = length(vigCoord);
-      float vig = smoothstep(0.46, 1.05, vigDist) * (0.12 + uStorm * 0.14);
+      float vig = smoothstep(0.46, 1.05, vigDist) * (0.12 + uStorm * 0.14) * clamp(1.0 - uSpiceTrance * 0.90, 0.0, 1.0);
       vec3 vigTint = mix(vec3(1.0), vec3(0.78, 0.68, 0.60), vig);
       color *= vigTint;
 
