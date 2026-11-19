@@ -14,6 +14,8 @@ export function createEnvironmentIBL(renderer, scene, worldState) {
 
   const uniforms = {
     uSunDir: { value: new THREE.Vector3(0.22, 0.14, -0.96) },
+    uMoonDir: { value: new THREE.Vector3(-0.14, 0.26, -0.955).normalize() },
+    uArvonDir: { value: new THREE.Vector3(0.12, 0.17, -0.978).normalize() },
     uSunColor: { value: new THREE.Color(0xffcfa0) },
     uZenithColor: { value: new THREE.Color(0x4b6088) },
     uHorizonColor: { value: new THREE.Color(0xe6ac7c) },
@@ -36,6 +38,8 @@ export function createEnvironmentIBL(renderer, scene, worldState) {
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uSunDir;
+      uniform vec3 uMoonDir;
+      uniform vec3 uArvonDir;
       uniform vec3 uSunColor;
       uniform vec3 uZenithColor;
       uniform vec3 uHorizonColor;
@@ -61,11 +65,15 @@ export function createEnvironmentIBL(renderer, scene, worldState) {
         float sunGlow = pow(sunDot, 16.0) * 0.45 + pow(sunDot, 180.0) * 2.8;
         col += uSunColor * sunGlow * sunUp * (uSunIntensity * 0.36) * (1.0 - uEclipse * 0.85) * (1.0 - uStorm * 0.72);
 
-        // Subtle cool moon/coronal highlight in night & eclipse reflections
+        // Dynamic Twin-Moon (Krelln + Arvon) & coronal specular lobes in twilight, night & eclipse reflections
         float nightBoost = max(1.0 - sunUp, uEclipse);
-        vec3 moonDir = normalize(vec3(-0.11, 0.34, -0.93));
+        vec3 moonDir = normalize(uMoonDir);
         float mDot = max(dot(d, moonDir), 0.0);
         col += vec3(0.42, 0.62, 0.96) * (pow(mDot, 64.0) * 0.65 + pow(mDot, 12.0) * 0.12) * nightBoost * (1.0 - uStorm * 0.6);
+
+        vec3 arvonDir = normalize(uArvonDir);
+        float aDot = max(dot(d, arvonDir), 0.0);
+        col += vec3(0.46, 0.60, 0.88) * (pow(aDot, 84.0) * 0.20 + pow(aDot, 16.0) * 0.035) * nightBoost * (1.0 - uEclipse * 0.70) * (1.0 - uStorm * 0.6);
 
         gl_FragColor = vec4(max(col, vec3(0.004)), 1.0);
       }
@@ -80,16 +88,24 @@ export function createEnvironmentIBL(renderer, scene, worldState) {
   let cooldown = 0;
 
   function computeKey() {
-    // Quantize key so PMREM rebuilds smoothly only when sky mood meaningfully shifts
+    // Quantize key so PMREM rebuilds smoothly only when sky mood or lunar azimuth meaningfully shifts
     const sy = Math.round(worldState.sunDir.y * 28);
     const sx = Math.round(worldState.sunDir.x * 16);
+    const mx = Math.round(Math.atan2(worldState.moonKrellnDir.x, -worldState.moonKrellnDir.z) * 24);
+    const my = Math.round(worldState.moonKrellnDir.y * 20);
     const ec = Math.round(worldState.eclipseStrength * 12);
     const st = Math.round(worldState.weatherWeights.coriolisStorm * 10);
-    return `${sy}:${sx}:${ec}:${st}`;
+    return `${sy}:${sx}:${mx}:${my}:${ec}:${st}`;
   }
 
   function rebuild() {
     uniforms.uSunDir.value.copy(worldState.sunDir);
+    if (worldState.moonKrellnDir) {
+      uniforms.uMoonDir.value.copy(worldState.moonKrellnDir);
+    }
+    if (worldState.moonArvonDir) {
+      uniforms.uArvonDir.value.copy(worldState.moonArvonDir);
+    }
     uniforms.uSunColor.value.copy(worldState.sunColor);
     uniforms.uZenithColor.value.copy(worldState.skyZenithColor);
     uniforms.uHorizonColor.value.copy(worldState.skyHorizonColor);

@@ -175,7 +175,7 @@ function createTerrainMaterial(sharedUniforms) {
     envMapIntensity: 0.25
   });
 
-  material.customProgramCacheKey = () => 'arrakis-terrain-pbr-v15-trails-caustics';
+  material.customProgramCacheKey = () => 'arrakis-terrain-pbr-v16-trail-selfshadow';
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, sharedUniforms);
@@ -686,6 +686,8 @@ if ( uWormTremor > 0.01 ) {
 }
 
 // 4b. Real-Time Dynamic Sand Footprints, Dune-Slide Chutes & Thumper Impact Craters
+vec3 sunDirW = normalize( uSunDir );
+float trailRimSpark = 0.0;
 if ( uTrailEnabled > 0.5 && rockFactor < 0.85 && viewDist < 42.0 ) {
   vec2 tUv = ( vWorldPos.xz - uTrailOrigin ) / uTrailSize + 0.5;
   if ( tUv.x > 0.02 && tUv.x < 0.98 && tUv.y > 0.02 && tUv.y < 0.98 ) {
@@ -698,25 +700,71 @@ if ( uTrailEnabled > 0.5 && rockFactor < 0.85 && viewDist < 42.0 ) {
     float tHeight = ( tSample.r - 0.5 ) * 2.0; // -1 recessed pit .. +1 raised rim
     float tComp = tSample.g;                   // 0 untouched .. 1 compacted
 
+    // Exact neutral baseline (R=128 -> tHeight=0.00392, G=0 -> tComp=0.0) skips 100% cleanly
     if ( abs( tHeight ) > 0.008 || tComp > 0.012 ) {
-      float texStep = 1.65 / 512.0;
-      float hL = ( texture2D( uTrailMap, tUv - vec2( texStep, 0.0 ) ).r - 0.5 ) * 2.0;
-      float hR = ( texture2D( uTrailMap, tUv + vec2( texStep, 0.0 ) ).r - 0.5 ) * 2.0;
-      float hD = ( texture2D( uTrailMap, tUv - vec2( 0.0, texStep ) ).r - 0.5 ) * 2.0;
-      float hU = ( texture2D( uTrailMap, tUv + vec2( 0.0, texStep ) ).r - 0.5 ) * 2.0;
+      const float TRAIL_NEUTRAL = 128.0 / 255.0;
+      float tHeightC = ( tSample.r - TRAIL_NEUTRAL ) * 2.0;
+      float trailAct = clamp(
+        max( ( abs( tHeight ) - 0.008 ) / 0.024, ( tComp - 0.012 ) / 0.032 ),
+        0.0,
+        1.0
+      );
+
+      // Footprint-adaptive kernel prevents grazing-angle stair-stepping & ridge silhouette aliasing
+      float texStep = clamp( max( 1.60 / 512.0, pxSize * 0.62 / uTrailSize ), 1.60 / 512.0, 3.50 / 512.0 );
+      float hL = ( texture2D( uTrailMap, tUv - vec2( texStep, 0.0 ) ).r - TRAIL_NEUTRAL ) * 2.0;
+      float hR = ( texture2D( uTrailMap, tUv + vec2( texStep, 0.0 ) ).r - TRAIL_NEUTRAL ) * 2.0;
+      float hD = ( texture2D( uTrailMap, tUv - vec2( 0.0, texStep ) ).r - TRAIL_NEUTRAL ) * 2.0;
+      float hU = ( texture2D( uTrailMap, tUv + vec2( 0.0, texStep ) ).r - TRAIL_NEUTRAL ) * 2.0;
       float worldSpan = 2.0 * texStep * uTrailSize;
       vec2 tGrad = vec2( ( hR - hL ) / worldSpan, ( hU - hD ) / worldSpan );
+      float tGradMag = length( tGrad );
+      if ( tGradMag > 2.45 ) {
+        tGrad *= 2.45 / tGradMag;
+      }
 
-      // Damp wind ripples cleanly inside fresh boot sole & carve crisp rim normal shading
-      float rippleSuppress = clamp( tComp * 0.84 * tWeight, 0.0, 0.90 );
+      float trailGrazingAA = smoothstep( 0.05, 0.22, abs( dot( n0, V ) ) );
+      float effWeight = tWeight * trailAct * ( 1.0 - wetFactor * 0.65 );
+      float normWeight = effWeight * trailGrazingAA;
+
+      float pitDepth = clamp( -tHeightC, 0.0, 1.0 );
+      float rimLift = clamp( tHeightC, 0.0, 1.0 );
+
+      // Damp wind ripples cleanly inside fresh boot sole / slide chute & carve crisp 3D normal relief
+      // (perturbed world normal automatically responds to Canopus sun, twin moons & nocturnal Glowglobe PointLight)
+      float rippleSuppress = clamp( ( tComp * 0.88 + pitDepth * 0.35 ) * effWeight, 0.0, 0.94 );
       totalGrad.xz *= ( 1.0 - rippleSuppress );
-      totalGrad.xz += tGrad * ( 0.36 * tWeight );
+      totalGrad.xz += tGrad * ( 0.54 * normWeight );
 
-      // Darken compacted interior pit slightly & brighten sunlit raised sand rim lip
-      float pitShadow = clamp( -tHeight, 0.0, 1.0 ) * tWeight;
-      float rimCatch = clamp( tHeight, 0.0, 1.0 ) * tWeight;
-      baseAlbedo *= ( 1.0 - pitShadow * 0.25 + rimCatch * 0.12 );
-      terrainRoughness = mix( terrainRoughness, 0.96, tComp * 0.5 * tWeight );
+      // Directional sun micro-self-shadowing (dot(tGrad, sunDirW.xz)) gated cleanly by sun elevation
+      float trailSunGate = smoothstep( -0.01, 0.09, sunDirW.y ) * ( 1.0 - darkGateM * 0.92 );
+      float lowSunRelief = mix( 1.38, 0.62, smoothstep( 0.10, 0.58, sunDirW.y ) );
+      float dirSlope = dot( tGrad, sunDirW.xz );
+      float slopeShadow = clamp( dirSlope * 0.56 * lowSunRelief, 0.0, 1.0 );
+      float slopeSunCatch = clamp( -dirSlope * 0.52 * lowSunRelief, 0.0, 1.0 );
+
+      float rimCastShadow = 0.0;
+      float sunHorizLen = length( sunDirW.xz );
+      if ( trailSunGate > 0.02 && sunHorizLen > 0.001 ) {
+        vec2 sunHorizDir = sunDirW.xz / sunHorizLen;
+        vec2 sunTapUv = clamp( tUv + sunHorizDir * ( 2.35 / 512.0 ), vec2( 0.002 ), vec2( 0.998 ) );
+        float hSunward = ( texture2D( uTrailMap, sunTapUv ).r - TRAIL_NEUTRAL ) * 2.0;
+        rimCastShadow = clamp( ( hSunward - tHeightC - max( sunDirW.y, 0.06 ) * 0.36 ) * 1.45, 0.0, 1.0 );
+      }
+      float dirSelfShadow = clamp( slopeShadow * 0.72 + rimCastShadow * 0.58, 0.0, 1.0 ) * trailSunGate * trailGrazingAA;
+
+      // Ambient cavity AO inside deep heel/forefoot cups & slide furrows (enhances day, twilight & nocturnal Glowglobe)
+      float cavityAO = clamp( pitDepth * 0.30 + tComp * pitDepth * 0.12, 0.0, 0.38 );
+
+      // Sunlit displaced-rim warm mineral catch + looser quartz grain roughness on freshly pushed rims
+      float sunlitRim = ( rimLift * 0.56 + slopeSunCatch * 0.64 * ( 0.35 + 0.65 * rimLift ) ) * trailSunGate * trailGrazingAA;
+      vec3 rimWarmTint = mix( baseAlbedo * 1.24, mix( sandCrest, uSunColor, 0.28 ), 0.38 );
+      baseAlbedo *= clamp( 1.0 - ( cavityAO + dirSelfShadow * 0.36 ) * effWeight, 0.42, 1.0 );
+      baseAlbedo = mix( baseAlbedo, rimWarmTint, clamp( sunlitRim * 0.34 * effWeight, 0.0, 0.28 ) );
+
+      terrainRoughness = mix( terrainRoughness, 0.96, clamp( tComp * pitDepth * 0.65 * effWeight, 0.0, 0.60 ) );
+      terrainRoughness = mix( terrainRoughness, 0.74, clamp( rimLift * 0.62 * normWeight, 0.0, 0.52 ) );
+      trailRimSpark = rimLift * ( 0.36 + 0.64 * slopeSunCatch ) * normWeight;
     }
   }
 }
@@ -752,7 +800,6 @@ if ( wetFactor > 0.005 ) {
 
 // 6. Mélange Spice Veins, Noon Inferior Heat-Mirage & Distant 3D Dune Sculpting
 vec3 arrakisEmissive = vec3( 0.0 );
-vec3 sunDirW = normalize( uSunDir );
 vec3 halfVec = normalize( sunDirW + V );
 float sunUp = smoothstep( -0.01, 0.16, sunDirW.y );
 float sunDayGate = smoothstep( 0.05, 0.15, sunUp );
@@ -845,7 +892,11 @@ arrakisEmissive += mix( uSunColor, vec3( 1.0, 0.58, 0.20 ), 0.48 ) * crestBackli
 float viewSparkle = pow( max( dot( arrakisWorldNormal, halfVec ), 0.0 ), 5.0 )
                   * pow( clamp( vnoise2( gmUv * 96.0 + V.xz * 2.8 ) * vnoise2( gmUv.yx * 134.0 - V.xz * 2.1 ) * 1.48, 0.0, 1.0 ), 13.5 )
                   * sparkFade * sunUp * sunDayGate * ( 1.0 - darkGateM ) * sandMask * dryMargin;
-arrakisEmissive += mix( uSunColor, vec3( 1.0, 0.78, 0.44 ), 0.45 ) * ( ( quartzSparkle * 0.038 + viewSparkle * 0.34 ) * sunUp * sunDayGate * sunStrength );
+float rimQuartzGlint = trailRimSpark * ( 0.45 + 0.55 * sp1 )
+                     * smoothstep( 0.12, 0.014, pxSize ) * ( 1.0 - smoothstep( 8.0, 28.0, viewDist ) )
+                     * ( 1.0 - darkGateM ) * sandMask * dryMargin;
+arrakisEmissive += mix( uSunColor, vec3( 1.0, 0.78, 0.44 ), 0.45 )
+                 * ( ( quartzSparkle * 0.038 + viewSparkle * 0.34 + rimQuartzGlint * 0.062 ) * sunUp * sunDayGate * sunStrength );
 
 // Strictly clamp all emissive/glint terms to 0 on capillary wet margins
 arrakisEmissive *= dryMargin;
@@ -879,6 +930,7 @@ totalEmissiveRadiance += arrakisEmissive;
         /* glsl */ `
 #include <lights_physical_fragment>
 float arrakisSpecIntensity = mix( 0.034, 0.052, clamp( wetFactor * 0.35 + rockFactor * 0.45, 0.0, 1.0 ) );
+arrakisSpecIntensity = mix( arrakisSpecIntensity, 0.105, clamp( trailRimSpark * 0.85, 0.0, 0.65 ) * dryMargin );
 arrakisSpecIntensity = mix( arrakisSpecIntensity, 0.13, quartzSparkle * dryMargin );
 #ifdef IOR
   #ifdef USE_SPECULAR

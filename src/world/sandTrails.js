@@ -65,10 +65,10 @@ export function createSandTrailsSystem(worldState) {
     };
   }
 
-  function recenter(targetX, targetZ) {
+  function recenter(targetX, targetZ, force = false) {
     const dx = targetX - origin.x;
     const dz = targetZ - origin.y;
-    if (Math.hypot(dx, dz) < 5.5) return;
+    if (!force && Math.hypot(dx, dz) < 5.5) return;
 
     // Snap shift to whole pixels to prevent subpixel blur on scroll
     const shiftPxX = Math.round((dx / MAP_WORLD_SIZE) * MAP_RES);
@@ -90,55 +90,91 @@ export function createSandTrailsSystem(worldState) {
   }
 
   /**
-   * Stamps a realistic Fremen boot footprint (raised displaced rim + recessed heel/toe trough).
+   * Stamps a realistic Fremen boot footprint (asymmetric displaced dry-sand rim + sculpted heel/forefoot trough).
    */
   function stampFootprint(wx, wz, yaw, isLeft = false, depth = 1.0, isSandwalk = false) {
     const { px, py } = worldToPx(wx, wz);
-    if (px < -16 || px > MAP_RES + 16 || py < -16 || py > MAP_RES + 16) return;
+    if (px < -24 || px > MAP_RES + 24 || py < -24 || py > MAP_RES + 24) return;
 
     const pxPerM = MAP_RES / MAP_WORLD_SIZE;
-    const bootLen = (isSandwalk ? 0.44 : 0.36) * pxPerM;
-    const bootWid = 0.19 * pxPerM;
+    const bootLen = (isSandwalk ? 0.52 : 0.42) * pxPerM;
+    const bootWid = (isSandwalk ? 0.25 : 0.22) * pxPerM;
     const clampedDepth = Math.max(0.25, Math.min(1.35, depth));
 
     ctx.save();
     ctx.translate(px, py);
-    // Align canvas rotation with Three.js yaw (forward = (-sin(yaw), -cos(yaw)) in XZ, canvas +Y is -Z)
-    ctx.rotate(-yaw + (isLeft ? 0.08 : -0.08));
+    // Align canvas +Y (which maps to world -Z) with Three.js yaw forward = (-sin(yaw), -cos(yaw))
+    const splay = isLeft ? 0.09 : -0.09;
+    const sweepSkew = isSandwalk ? (isLeft ? 0.05 : -0.05) : 0.0;
+    ctx.rotate(yaw + splay + sweepSkew);
 
-    // 1. Subtle outer displaced sand rim lip (R > 128, slight G disturbance)
-    const rimGrad = ctx.createRadialGradient(0, 0, bootWid * 0.42, 0, 0, bootLen * 0.92);
-    const rimR = Math.round(128 + 64 * clampedDepth);
+    // 1. Asymmetric outer displaced dry-sand angle-of-repose rim lip (R > 128, biased slightly forward & outward)
+    const rimOffX = (isLeft ? -0.10 : 0.10) * bootWid * (isSandwalk ? 1.35 : 0.75);
+    const rimOffY = bootLen * 0.07;
+    const rimGrad = ctx.createRadialGradient(
+      rimOffX,
+      rimOffY,
+      bootWid * 0.42,
+      rimOffX,
+      rimOffY,
+      bootLen * 1.04
+    );
+    const rimR = Math.round(Math.min(248, 128 + 86 * clampedDepth));
     rimGrad.addColorStop(0.0, `rgba(${rimR}, 145, 128, 0.0)`);
-    rimGrad.addColorStop(0.55, `rgba(${rimR}, 155, 128, ${0.46 * clampedDepth})`);
-    rimGrad.addColorStop(1.0, `rgba(128, 0, 128, 0.0)`);
+    rimGrad.addColorStop(0.52, `rgba(${rimR}, 168, 128, ${Math.min(0.78, 0.58 * clampedDepth)})`);
+    rimGrad.addColorStop(0.80, `rgba(${Math.round(128 + 42 * clampedDepth)}, 88, 128, ${Math.min(0.42, 0.28 * clampedDepth)})`);
+    rimGrad.addColorStop(1.0, 'rgba(128, 0, 128, 0.0)');
     ctx.fillStyle = rimGrad;
     ctx.beginPath();
-    ctx.ellipse(0, 0, bootWid * 1.45, bootLen * 0.88, 0, 0, Math.PI * 2);
+    ctx.ellipse(rimOffX, rimOffY, bootWid * 1.56, bootLen * 0.98, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Sculpted boot-sole recessed depression (forefoot + heel)
-    const pitR = Math.round(Math.max(10, 128 - 108 * clampedDepth));
-    const soleG = Math.round(Math.min(255, 220 * clampedDepth));
+    // Optional hushed Fremen Sandwalk crescent drag tail behind heel
+    if (isSandwalk) {
+      const dragX = (isLeft ? 0.14 : -0.14) * bootWid;
+      const dragY = -bootLen * 0.44;
+      const dragGrad = ctx.createRadialGradient(dragX, dragY, 0, dragX, dragY, bootWid * 1.05);
+      const dragPitR = Math.round(Math.max(48, 128 - 54 * clampedDepth));
+      dragGrad.addColorStop(0.0, `rgba(${dragPitR}, ${Math.round(165 * clampedDepth)}, 128, ${0.48 * clampedDepth})`);
+      dragGrad.addColorStop(1.0, 'rgba(128, 0, 128, 0.0)');
+      ctx.fillStyle = dragGrad;
+      ctx.beginPath();
+      ctx.ellipse(dragX, dragY, bootWid * 0.85, bootLen * 0.36, isLeft ? -0.22 : 0.22, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Sculpted boot-sole recessed depression (forefoot ball + arch bridge + heel cup)
+    const pitR = Math.round(Math.max(8, 128 - 114 * clampedDepth));
+    const soleG = Math.round(Math.min(255, 236 * clampedDepth));
+
+    // Midfoot arch bridge so dry sand forms a cohesive continuous 3D funnel
+    const archGrad = ctx.createRadialGradient(0, -bootLen * 0.03, 0, 0, -bootLen * 0.03, bootWid * 0.82);
+    archGrad.addColorStop(0.0, `rgba(${pitR + 16}, ${soleG}, 128, 0.76)`);
+    archGrad.addColorStop(0.72, `rgba(${pitR + 34}, ${Math.round(soleG * 0.82)}, 128, 0.44)`);
+    archGrad.addColorStop(1.0, 'rgba(128, 0, 128, 0.0)');
+    ctx.fillStyle = archGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, -bootLen * 0.03, bootWid * 0.68, bootLen * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     // Forefoot ball
-    const ballGrad = ctx.createRadialGradient(0, bootLen * 0.20, 0, 0, bootLen * 0.20, bootWid * 0.95);
-    ballGrad.addColorStop(0.0, `rgba(${pitR}, ${soleG}, 128, 0.92)`);
-    ballGrad.addColorStop(0.65, `rgba(${pitR + 18}, ${soleG}, 128, 0.65)`);
-    ballGrad.addColorStop(1.0, `rgba(128, 0, 128, 0.0)`);
+    const ballGrad = ctx.createRadialGradient(0, bootLen * 0.21, 0, 0, bootLen * 0.21, bootWid * 0.98);
+    ballGrad.addColorStop(0.0, `rgba(${pitR}, ${soleG}, 128, 0.94)`);
+    ballGrad.addColorStop(0.64, `rgba(${pitR + 18}, ${soleG}, 128, 0.68)`);
+    ballGrad.addColorStop(1.0, 'rgba(128, 0, 128, 0.0)');
     ctx.fillStyle = ballGrad;
     ctx.beginPath();
-    ctx.ellipse(0, bootLen * 0.20, bootWid * 0.78, bootLen * 0.44, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, bootLen * 0.21, bootWid * 0.84, bootLen * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Heel cup
-    const heelGrad = ctx.createRadialGradient(0, -bootLen * 0.26, 0, 0, -bootLen * 0.26, bootWid * 0.80);
-    heelGrad.addColorStop(0.0, `rgba(${pitR}, ${soleG}, 128, 0.88)`);
-    heelGrad.addColorStop(0.7, `rgba(${pitR + 20}, ${soleG}, 128, 0.55)`);
-    heelGrad.addColorStop(1.0, `rgba(128, 0, 128, 0.0)`);
+    const heelGrad = ctx.createRadialGradient(0, -bootLen * 0.26, 0, 0, -bootLen * 0.26, bootWid * 0.86);
+    heelGrad.addColorStop(0.0, `rgba(${pitR}, ${soleG}, 128, 0.90)`);
+    heelGrad.addColorStop(0.68, `rgba(${pitR + 20}, ${soleG}, 128, 0.58)`);
+    heelGrad.addColorStop(1.0, 'rgba(128, 0, 128, 0.0)');
     ctx.fillStyle = heelGrad;
     ctx.beginPath();
-    ctx.ellipse(0, -bootLen * 0.26, bootWid * 0.65, bootLen * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -bootLen * 0.26, bootWid * 0.72, bootLen * 0.36, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -156,7 +192,7 @@ export function createSandTrailsSystem(worldState) {
 
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate(-yaw);
+    ctx.rotate(yaw);
 
     // Outer plowed ridge
     const rimGrad = ctx.createRadialGradient(0, 0, rad * 0.4, 0, 0, rad * 1.45);
@@ -220,10 +256,71 @@ export function createSandTrailsSystem(worldState) {
 
   function clearAll() {
     clearToNeutral(ctx);
-    dirty = true;
+    fadeAccum = 0;
+    dirty = false;
+    texture.needsUpdate = true;
     for (let i = 0; i < MAX_WATER_RIPPLES; i++) {
       waterRipples[i].set(0, 0, -999, 0);
     }
+  }
+
+  /**
+   * Deterministic helper that clears existing trails, centers the high-res trail window on (cx, cz),
+   * and stamps a curved, irregular Fremen Sandwalk footprint trail leading into a short crest slide furrow.
+   */
+  function seedShowcaseTrail(cx = 3.2, cz = -30.5, yaw = 0.35, steps = 14, isSandwalk = true) {
+    clearAll();
+    recenter(cx, cz, true);
+
+    const count = Math.max(2, Math.floor(steps));
+    const fwdX = -Math.sin(yaw);
+    const fwdZ = -Math.cos(yaw);
+    const rightX = Math.cos(yaw);
+    const rightZ = -Math.sin(yaw);
+
+    const sStart = -2.45;
+    const sSpan = 5.95;
+
+    for (let i = 0; i < count; i++) {
+      const u = i / (count - 1);
+      // Irregular "walk without rhythm" cadence when Sandwalking, deterministic across runs
+      const cadenceJitter = isSandwalk
+        ? (Math.sin(i * 2.35 + 0.6) * 0.08 + Math.cos(i * 3.7) * 0.04) * (1.0 - Math.abs(2.0 * u - 1.0) * 0.35)
+        : 0.0;
+      const s = sStart + u * sSpan + cadenceJitter;
+
+      const curvePhase = u * Math.PI * 1.45 - 0.35;
+      const sway = Math.sin(curvePhase) * 0.34;
+      const swaySlope = ((Math.PI * 1.45) / sSpan) * Math.cos(curvePhase) * 0.34;
+      const stepYaw = yaw - Math.atan(swaySlope);
+
+      const isLeft = i % 2 === 0;
+      const stance = (isLeft ? -0.175 : 0.175) + (isSandwalk ? Math.sin(i * 1.9) * 0.035 : 0.0);
+      const lat = sway + stance;
+
+      const wx = cx + fwdX * s + rightX * lat;
+      const wz = cz + fwdZ * s + rightZ * lat;
+      const depth = 1.08 + 0.14 * Math.sin(i * 1.7 + 0.4);
+      stampFootprint(wx, wz, stepYaw, isLeft, depth, isSandwalk);
+    }
+
+    // Short sand-slide chute cresting over the dune brink right ahead of the final steps
+    const endCurvePhase = Math.PI * 1.45 - 0.35;
+    const endSway = Math.sin(endCurvePhase) * 0.34;
+    const furrowYaw = yaw + 0.12;
+    const fFwdX = -Math.sin(furrowYaw);
+    const fFwdZ = -Math.cos(furrowYaw);
+    const baseX = cx + fwdX * (sStart + sSpan + 0.22) + rightX * endSway;
+    const baseZ = cz + fwdZ * (sStart + sSpan + 0.22) + rightZ * endSway;
+    for (let k = 0; k < 5; k++) {
+      const fs = k * 0.26;
+      const intensity = 0.72 + 0.22 * Math.sin((k / 4) * Math.PI);
+      stampSlideFurrow(baseX + fFwdX * fs, baseZ + fFwdZ * fs, furrowYaw, intensity);
+    }
+
+    fadeAccum = 0;
+    dirty = false;
+    texture.needsUpdate = true;
   }
 
   function update(dt) {
@@ -271,9 +368,11 @@ export function createSandTrailsSystem(worldState) {
     origin,
     worldSize: MAP_WORLD_SIZE,
     waterRipples,
+    recenter,
     stampFootprint,
     stampSlideFurrow,
     stampCrater,
+    seedShowcaseTrail,
     addWaterRipple,
     clearAll,
     update,

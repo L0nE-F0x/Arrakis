@@ -176,10 +176,54 @@ const ArrakisAtmoShader = {
 
       if (uOptics > 0.01) {
         float lensR = length(centered * vec2(1.18, 1.0));
-        float opticMask = 1.0 - smoothstep(0.42, 0.58, lensR) * 0.88 * uOptics;
+
+        // 1. Subtle warm-amber / Ibad-blue spectral contrast separation on distant spice & worm plumes
+        //    with gentle optical dehaze keeping the central aiming aperture crystal clear and legible
+        vec3 dehazed = clamp((color - 0.016 * uOptics) / (1.0 - 0.016 * uOptics), vec3(0.0), vec3(8.0));
+        dehazed = mix(color, pow(max(dehazed, vec3(1e-4)), vec3(1.05)) * 1.04, 0.52 * uOptics);
+
+        float optLuma = dot(dehazed, vec3(0.2126, 0.7152, 0.0722));
+        float warmth = dehazed.r - dehazed.b;
+        float distPlumeZone = 0.42 + 0.58 * (
+          smoothstep(uHorizonY - 0.28, uHorizonY + 0.05, vUv.y) *
+          (1.0 - smoothstep(uHorizonY + 0.25, uHorizonY + 0.55, vUv.y))
+        );
+        float plumeWarmMask = smoothstep(0.025, 0.24, warmth)
+                            * smoothstep(0.05, 0.30, optLuma)
+                            * (1.0 - smoothstep(0.78, 1.25, optLuma));
+        float coolShadowMask = (1.0 - smoothstep(-0.02, 0.17, warmth))
+                             * smoothstep(0.012, 0.20, optLuma)
+                             * (1.0 - smoothstep(0.34, 0.72, optLuma));
+        float shadowCrevice = (1.0 - smoothstep(0.04, 0.22, optLuma)) * smoothstep(0.008, 0.055, optLuma);
+
+        vec3 warmAmberGrade = dehazed * vec3(1.072, 0.995, 0.888) + vec3(0.012, 0.005, -0.003) * optLuma;
+        vec3 ibadShadowGrade = dehazed * vec3(0.918, 0.986, 1.112) + vec3(-0.002, 0.004, 0.014);
+
+        color = dehazed;
+        color = mix(color, warmAmberGrade, plumeWarmMask * distPlumeZone * 0.42 * uOptics);
+        color = mix(color, ibadShadowGrade, clamp(coolShadowMask + shadowCrevice * 0.5, 0.0, 1.0) * distPlumeZone * 0.34 * uOptics);
+
+        // 2. Ultra-subtle optical rangefinder micro-grid, stadia rings & scanline lens texture near periphery ONLY
+        //    (lensR < 0.24 central aiming aperture stays 100% untouched & crystal clear)
+        float periphZone = smoothstep(0.24, 0.43, lensR) * (1.0 - smoothstep(0.49, 0.59, lensR));
+        if (periphZone > 0.002) {
+          float scanWave = sin(gl_FragCoord.y * 2.094) * 0.5 + 0.5;
+          vec2 gridCell = abs(fract(gl_FragCoord.xy / 32.0 - 0.5) - 0.5) * 32.0;
+          float microGrid = 1.0 - smoothstep(0.0, 1.15, min(gridCell.x, gridCell.y));
+          float ringA = exp(-pow((lensR - 0.355) / 0.0020, 2.0));
+          float ringB = exp(-pow((lensR - 0.435) / 0.0016, 2.0));
+          float stadiaArcs = (ringA * 0.65 + ringB * 0.45) * (0.65 + 0.35 * smoothstep(0.05, 0.22, abs(centered.x)));
+
+          color *= 1.0 - scanWave * 0.026 * periphZone * uOptics;
+          vec3 lensCoatTint = mix(vec3(0.36, 0.76, 1.06), vec3(1.0, 0.80, 0.48), 0.44);
+          color += lensCoatTint * (microGrid * 0.015 + stadiaArcs * 0.024) * periphZone * uOptics;
+        }
+
+        // 3. Dielectric oil-lens rim sheen & binocular housing border vignette
+        float bezelGleam = exp(-pow((lensR - 0.465) / 0.016, 2.0)) * uOptics;
+        color += vec3(0.14, 0.40, 0.68) * bezelGleam * 0.042;
+        float opticMask = 1.0 - smoothstep(0.43, 0.59, lensR) * 0.88 * uOptics;
         color *= opticMask;
-        // Crisp optical contrast boost
-        color = mix(color, color * vec3(1.03, 1.02, 0.99), uOptics * 0.4);
       }
 
       // 8. Subtle natural 35mm film grain + 8-bit sky/horizon dither (velvety-clean in darks, zero speckle)
