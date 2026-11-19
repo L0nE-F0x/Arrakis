@@ -16,7 +16,9 @@ const CAM_LABELS = {
   muaddib: "Muad'Dib",
   ornithopter: 'Ornithopter',
   worm: 'Shai-Hulud',
-  spice: 'Spice Blow'
+  spice: 'Spice Blow',
+  footprints: 'Sandwalk Trail',
+  spiceCrater: 'Spice Crater'
 };
 
 export function initHud(worldState, cameraController, callbacks = {}) {
@@ -156,39 +158,57 @@ export function initHud(worldState, cameraController, callbacks = {}) {
       return d;
     };
 
-    // Minor 15-deg ticks
-    compassCtx.strokeStyle = 'rgba(230, 173, 102, 0.28)';
+    // Subtle feathered Fremen gold track baseline
+    const baseGrad = compassCtx.createLinearGradient(0, 0, w, 0);
+    baseGrad.addColorStop(0.0, 'rgba(230, 173, 102, 0.0)');
+    baseGrad.addColorStop(0.18, 'rgba(230, 173, 102, 0.32)');
+    baseGrad.addColorStop(0.50, 'rgba(255, 208, 137, 0.48)');
+    baseGrad.addColorStop(0.82, 'rgba(230, 173, 102, 0.32)');
+    baseGrad.addColorStop(1.0, 'rgba(230, 173, 102, 0.0)');
+    compassCtx.strokeStyle = baseGrad;
+    compassCtx.lineWidth = 1;
+    compassCtx.beginPath();
+    compassCtx.moveTo(0, h - 4.5);
+    compassCtx.lineTo(w, h - 4.5);
+    compassCtx.stroke();
+
+    // Minor 15-deg & major 45-deg ticks
     compassCtx.lineWidth = 1;
     for (let deg = 0; deg < 360; deg += 15) {
       const delta = wrapDelta(deg);
       if (Math.abs(delta) > halfSpanDeg) continue;
-      const x = w * 0.5 + delta * pxPerDeg;
+      const x = Math.round(w * 0.5 + delta * pxPerDeg) + 0.5;
       const edgeFade = Math.max(0, 1 - Math.abs(delta) / halfSpanDeg);
-      compassCtx.globalAlpha = edgeFade * 0.75;
+      const isMajor = deg % 45 === 0;
+      compassCtx.strokeStyle = isMajor ? 'rgba(255, 212, 142, 0.78)' : 'rgba(230, 173, 102, 0.36)';
+      compassCtx.globalAlpha = edgeFade * (isMajor ? 0.92 : 0.72);
       compassCtx.beginPath();
-      compassCtx.moveTo(x, h - 5);
-      compassCtx.lineTo(x, h - (deg % 45 === 0 ? 11 : 8));
+      compassCtx.moveTo(x, h - 4.5);
+      compassCtx.lineTo(x, h - (isMajor ? 11.5 : 8));
       compassCtx.stroke();
     }
 
-    // Cardinal labels
+    // Cardinal labels with crisp dark halo for legibility over sunlit dunes & night sky
     compassCtx.textAlign = 'center';
     compassCtx.textBaseline = 'middle';
+    compassCtx.shadowColor = 'rgba(0, 0, 0, 0.88)';
+    compassCtx.shadowBlur = 3;
     for (const c of cardinals) {
       const delta = wrapDelta(c.deg);
       if (Math.abs(delta) > halfSpanDeg - 6) continue;
       const x = w * 0.5 + delta * pxPerDeg;
       const edgeFade = Math.max(0, 1 - Math.abs(delta) / halfSpanDeg);
       compassCtx.globalAlpha = edgeFade;
-      compassCtx.font = c.major ? '700 11px Inter, sans-serif' : '500 9.5px Inter, sans-serif';
-      compassCtx.fillStyle = c.label === 'N' ? '#ffd089' : 'rgba(244, 234, 220, 0.84)';
-      compassCtx.fillText(c.label, x, 13);
+      compassCtx.font = c.major ? '700 11px Inter, sans-serif' : '600 9.5px Inter, sans-serif';
+      compassCtx.fillStyle =
+        c.label === 'N' ? '#ffd792' : c.major ? '#f9f0e4' : 'rgba(238, 198, 142, 0.88)';
+      compassCtx.fillText(c.label, x, 12.5);
     }
 
     // Landmark, Thumper & Wormsign directional pips
     const px = p.feetPosition.x;
     const pz = p.feetPosition.z;
-    const drawPip = (tx, tz, color, radius = 3.0, diamond = false) => {
+    const drawPip = (tx, tz, color, radius = 3.0, diamond = false, glow = null) => {
       const dx = tx - px;
       const dz = tz - pz;
       const dist = Math.hypot(dx, dz);
@@ -200,7 +220,9 @@ export function initHud(worldState, cameraController, callbacks = {}) {
       if (Math.abs(delta) > halfSpanDeg - 4) return;
       const x = w * 0.5 + delta * pxPerDeg;
       const edgeFade = Math.max(0, 1 - Math.abs(delta) / halfSpanDeg);
-      compassCtx.globalAlpha = edgeFade * 0.95;
+      compassCtx.globalAlpha = edgeFade * 0.96;
+      compassCtx.shadowColor = glow || 'rgba(0, 0, 0, 0.9)';
+      compassCtx.shadowBlur = glow ? 5 : 2;
       compassCtx.fillStyle = color;
       compassCtx.beginPath();
       if (diamond) {
@@ -218,16 +240,18 @@ export function initHud(worldState, cameraController, callbacks = {}) {
     for (let i = 0; i < ARRAKIS_LANDMARKS.length; i++) {
       const lm = ARRAKIS_LANDMARKS[i];
       const known = p.discoveredIds.has(lm.id);
-      drawPip(lm.x, lm.z, known ? lm.color : 'rgba(255, 226, 178, 0.58)', known ? 2.8 : 2.3, !known);
+      drawPip(lm.x, lm.z, known ? lm.color : 'rgba(255, 226, 178, 0.66)', known ? 3.0 : 2.4, !known);
     }
 
     if (worldState.thumper.active) {
-      drawPip(worldState.thumper.position.x, worldState.thumper.position.z, '#52b8ff', 3.8, true);
+      drawPip(worldState.thumper.position.x, worldState.thumper.position.z, '#5ec2ff', 4.0, true, 'rgba(75, 169, 255, 0.85)');
     }
     if (worldState.worm.phase === 'hunting' || worldState.worm.phase === 'breach') {
-      drawPip(worldState.worm.position.x, worldState.worm.position.z, '#ff5d3b', 4.3, true);
+      drawPip(worldState.worm.position.x, worldState.worm.position.z, '#ff6240', 4.5, true, 'rgba(255, 92, 58, 0.92)');
     }
 
+    compassCtx.shadowBlur = 0;
+    compassCtx.shadowColor = 'transparent';
     compassCtx.globalAlpha = 1.0;
   }
 
@@ -237,14 +261,6 @@ export function initHud(worldState, cameraController, callbacks = {}) {
     const h = seismoCanvas.height;
     seismoCtx.clearRect(0, 0, w, h);
 
-    // Subtle baseline
-    seismoCtx.strokeStyle = 'rgba(230, 173, 102, 0.16)';
-    seismoCtx.lineWidth = 1;
-    seismoCtx.beginPath();
-    seismoCtx.moveTo(0, h * 0.5);
-    seismoCtx.lineTo(w, h * 0.5);
-    seismoCtx.stroke();
-
     const p = worldState.player;
     const samples = p.seismicSamples;
     const len = samples.length;
@@ -253,17 +269,82 @@ export function initHud(worldState, cameraController, callbacks = {}) {
     const isDanger = worldState.worm.phase === 'hunting' || worldState.worm.phase === 'breach' || p.wormThreat > 0.55;
     const isSandwalk = p.sandwalking && p.onOpenErg;
 
-    seismoCtx.strokeStyle = isDanger ? '#ff6a46' : isSandwalk ? '#62baff' : '#f2ba70';
-    seismoCtx.lineWidth = isDanger ? 2.0 : 1.5;
+    // Subtle oscilloscope reticle grid (center baseline + +/-32% guides + sweep divisions)
+    seismoCtx.strokeStyle = isDanger
+      ? 'rgba(255, 106, 70, 0.16)'
+      : isSandwalk
+        ? 'rgba(98, 186, 255, 0.16)'
+        : 'rgba(230, 173, 102, 0.14)';
+    seismoCtx.lineWidth = 1;
+    seismoCtx.beginPath();
+    seismoCtx.moveTo(0, h * 0.5);
+    seismoCtx.lineTo(w, h * 0.5);
+    seismoCtx.moveTo(0, h * 0.18);
+    seismoCtx.lineTo(w, h * 0.18);
+    seismoCtx.moveTo(0, h * 0.82);
+    seismoCtx.lineTo(w, h * 0.82);
+    for (let g = 1; g < 4; g++) {
+      const gx = Math.round((w * g) / 4) + 0.5;
+      seismoCtx.moveTo(gx, 2);
+      seismoCtx.lineTo(gx, h - 2);
+    }
+    seismoCtx.stroke();
+
+    const strokeCol = isDanger ? '#ff6c47' : isSandwalk ? '#66c2ff' : '#f4bf74';
+    const fillCol = isDanger
+      ? 'rgba(255, 98, 60, 0.16)'
+      : isSandwalk
+        ? 'rgba(82, 184, 255, 0.15)'
+        : 'rgba(242, 186, 112, 0.13)';
+    const glowCol = isDanger
+      ? 'rgba(255, 92, 54, 0.72)'
+      : isSandwalk
+        ? 'rgba(75, 169, 255, 0.65)'
+        : 'rgba(230, 168, 92, 0.55)';
+
+    // Soft ribbon fill between trace and midline
+    seismoCtx.beginPath();
+    seismoCtx.moveTo(0, h * 0.5);
+    let lastX = 0;
+    let lastY = h * 0.5;
+    for (let i = 0; i < len; i++) {
+      const s = samples[(cur + i) % len];
+      const x = (i / (len - 1)) * w;
+      const y = h * 0.5 - s * (h * 0.43);
+      seismoCtx.lineTo(x, y);
+      lastX = x;
+      lastY = y;
+    }
+    seismoCtx.lineTo(w, h * 0.5);
+    seismoCtx.closePath();
+    seismoCtx.fillStyle = fillCol;
+    seismoCtx.fill();
+
+    // Crisp luminous seismic trace line
+    seismoCtx.strokeStyle = strokeCol;
+    seismoCtx.lineWidth = isDanger ? 2.1 : 1.7;
+    seismoCtx.lineCap = 'round';
+    seismoCtx.lineJoin = 'round';
+    seismoCtx.shadowColor = glowCol;
+    seismoCtx.shadowBlur = isDanger ? 7 : 4;
     seismoCtx.beginPath();
     for (let i = 0; i < len; i++) {
       const s = samples[(cur + i) % len];
       const x = (i / (len - 1)) * w;
-      const y = h * 0.5 - s * (h * 0.44);
+      const y = h * 0.5 - s * (h * 0.43);
       if (i === 0) seismoCtx.moveTo(x, y);
       else seismoCtx.lineTo(x, y);
     }
     seismoCtx.stroke();
+
+    // Live leading-edge stylus dot
+    seismoCtx.fillStyle = isDanger ? '#ffd0b8' : isSandwalk ? '#d6eeff' : '#ffe4b4';
+    seismoCtx.beginPath();
+    seismoCtx.arc(Math.min(w - 2.5, lastX), lastY, isDanger ? 2.4 : 1.9, 0, Math.PI * 2);
+    seismoCtx.fill();
+
+    seismoCtx.shadowBlur = 0;
+    seismoCtx.shadowColor = 'transparent';
 
     // Update status labels
     seismoPanel?.classList.toggle('danger', isDanger);
@@ -282,38 +363,21 @@ export function initHud(worldState, cameraController, callbacks = {}) {
     }
   }
 
-  function updateFremenHud(dt) {
+  function syncFremenHudVisuals() {
     const p = worldState.player;
     const isWalk = worldState.cameraMode === 'walk' && p.active;
     hudRoot?.classList.toggle('walk-mode', isWalk);
+    hudRoot?.classList.toggle('optics-mode', isWalk && p.opticsActive);
     fremenHud?.classList.toggle('hidden', !isWalk);
-
-    // Drain poetic discovery/event toast queue cleanly even outside walk mode
-    if (activeToastTimer > 0) {
-      activeToastTimer -= dt;
-      if (activeToastTimer <= 0.45 && toastBanner) {
-        toastBanner.classList.add('fade-out');
-      }
-      if (activeToastTimer <= 0 && toastBanner) {
-        toastBanner.classList.add('hidden');
-        toastBanner.classList.remove('fade-out');
-      }
-    } else if (p.toastQueue.length > 0 && toastBanner) {
-      const next = p.toastQueue.shift();
-      if (toastKicker) toastKicker.textContent = next.kicker;
-      if (toastTitle) toastTitle.textContent = next.title;
-      if (toastDetail) toastDetail.textContent = next.detail || '';
-      toastBanner.classList.remove('hidden', 'fade-out');
-      activeToastTimer = 4.6;
-    }
 
     if (!isWalk) return;
 
     drawCompass();
     drawSeismograph();
 
+    const hideLockHint = p.opticsActive || document.body.classList.contains('screenshot-clean');
     walkLockHint?.classList.toggle('locked', p.pointerLocked);
-    walkLockHint?.classList.toggle('hidden', p.opticsActive);
+    walkLockHint?.classList.toggle('hidden', hideLockHint);
 
     // Crosshair & contextual [E] prompt
     const promptText = p.nearbyPrompt;
@@ -353,15 +417,47 @@ export function initHud(worldState, cameraController, callbacks = {}) {
       }
     }
 
-    // Quick Gear Chips & Stillsuit Vitals
+    // Quick Gear Chips & Stillsuit Vitals (.active always reflects active state; .active-blue adds spice-blue accent)
+    gearSandwalk?.classList.toggle('active', p.sandwalking);
     gearSandwalk?.classList.toggle('active-blue', p.sandwalking);
-    gearThumper?.classList.toggle('active-blue', p.thumperAiming || worldState.thumper.active);
+    const thumperLit = p.thumperAiming || worldState.thumper.active;
+    gearThumper?.classList.toggle('active', thumperLit);
+    gearThumper?.classList.toggle('active-blue', thumperLit);
     gearGlowglobe?.classList.toggle('active', p.glowglobeOn);
     gearOptics?.classList.toggle('active', p.opticsActive);
 
     if (vitalWater) vitalWater.textContent = `${Math.round(p.hydration * 100)}%`;
     if (vitalSpice) vitalSpice.textContent = String(p.spiceCollected);
     if (vitalDisc) vitalDisc.textContent = `${p.discoveredIds.size}/${ARRAKIS_LANDMARKS.length}`;
+  }
+
+  function updateFremenHud(dt) {
+    const p = worldState.player;
+
+    // Drain poetic discovery/event toast queue cleanly even outside walk mode
+    if (activeToastTimer > 0) {
+      activeToastTimer -= dt;
+      if (activeToastTimer <= 0.45 && toastBanner) {
+        toastBanner.classList.add('fade-out');
+      }
+      if (activeToastTimer <= 0 && toastBanner) {
+        toastBanner.classList.add('hidden');
+        toastBanner.classList.remove('fade-out');
+      }
+    } else if (p.toastQueue.length > 0 && toastBanner && !p.opticsActive) {
+      const next = p.toastQueue.shift();
+      if (toastKicker) toastKicker.textContent = next.kicker;
+      if (toastTitle) toastTitle.textContent = next.title;
+      if (toastDetail) toastDetail.textContent = next.detail || '';
+      toastBanner.classList.remove('hidden', 'fade-out');
+      activeToastTimer = 4.6;
+    }
+
+    if (toastBanner && p.opticsActive) {
+      toastBanner.classList.add('hidden');
+    }
+
+    syncFremenHudVisuals();
   }
 
   function syncFromState(force = false) {
@@ -480,6 +576,11 @@ export function initHud(worldState, cameraController, callbacks = {}) {
     if (typeof audioOn === 'boolean' && audioOn !== audioEnabled) {
       audioEnabled = audioOn;
       btnAudio?.classList.toggle('active', audioEnabled);
+    }
+
+    // Immediately redraw diegetic compass, seismograph, optics overlay & active gear chips when in walk mode
+    if (force || worldState.player.active) {
+      syncFremenHudVisuals();
     }
   }
 

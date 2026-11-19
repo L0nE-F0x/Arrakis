@@ -33,6 +33,26 @@ function colorize(geom, hex, jitter = 0.0) {
   return g;
 }
 
+function colorizeByFn(geom, fn) {
+  const g = geom.index ? geom.toNonIndexed() : geom.clone();
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const pos = g.attributes.position;
+  const count = pos.count;
+  const arr = new Float32Array(count * 3);
+  const col = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    fn(pos.getX(i), pos.getY(i), pos.getZ(i), col, i);
+    arr[i * 3] = Math.min(1, Math.max(0, col.r));
+    arr[i * 3 + 1] = Math.min(1, Math.max(0, col.g));
+    arr[i * 3 + 2] = Math.min(1, Math.max(0, col.b));
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  if (!g.attributes.uv) {
+    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+  }
+  return g;
+}
+
 let _softGlowTex = null;
 function getSoftGlowTexture() {
   if (_softGlowTex) return _softGlowTex;
@@ -61,11 +81,21 @@ function buildFremenCamp(worldState, colliders, interactables) {
   const cx = -14.5;
   const cz = 5.5;
   const cy = getGroundHeight(cx, cz);
+  const rotY = 0.42;
+  const cosR = Math.cos(rotY);
+  const sinR = Math.sin(rotY);
+
+  // Convert camp-local (lx, lz) to exact local ground Y relative to camp origin cy
+  const localGroundY = (lx, lz) => {
+    const wx = cx + lx * cosR + lz * sinR;
+    const wz = cz - lx * sinR + lz * cosR;
+    return getGroundHeight(wx, wz) - cy;
+  };
 
   const camp = new THREE.Group();
   camp.name = 'YardangSanctuaryCamp';
   camp.position.set(cx, cy, cz);
-  camp.rotation.y = 0.42;
+  camp.rotation.y = rotY;
 
   // Shared wind uniforms for billowing fabric canopy & banners
   const clothUniforms = {
@@ -74,7 +104,7 @@ function buildFremenCamp(worldState, colliders, interactables) {
     uWindSpeed: { value: 0.45 }
   };
 
-  // --- Canopy Posts (4 tilted composite desert-wood/brass poles) ---
+  // --- Canopy Posts (4 tilted composite desert-wood/brass poles + stone anchor collars) ---
   const postMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
@@ -89,8 +119,9 @@ function buildFremenCamp(worldState, colliders, interactables) {
     [1.95, 1.65, 1.95, -0.06, 0.05]
   ];
   for (const [px, pz, h, rx, rz] of postCoords) {
-    const pole = new THREE.CylinderGeometry(0.042, 0.058, h + 0.5, 8);
-    pole.translate(0, (h - 0.5) * 0.5, 0);
+    const pgy = localGroundY(px, pz);
+    const pole = new THREE.CylinderGeometry(0.042, 0.058, h + 0.65, 8);
+    pole.translate(0, (h - 0.45) * 0.5, 0);
     pole.rotateX(rx);
     pole.rotateZ(rz);
     pole.translate(px, 0, pz);
@@ -103,6 +134,11 @@ function buildFremenCamp(worldState, colliders, interactables) {
     ring.rotateZ(rz);
     ring.translate(px, 0, pz);
     poleParts.push(colorize(ring, 0xc79248, 0.05));
+
+    // Grounded sandstone anchor collar seated flush where each post meets the desert floor
+    const collar = new THREE.CylinderGeometry(0.11, 0.21, 0.16, 7);
+    collar.translate(px, pgy + 0.03, pz);
+    poleParts.push(colorize(collar, 0x7c5838, 0.09));
   }
   const polesMesh = new THREE.Mesh(mergeGeometries(poleParts, false), postMat);
   polesMesh.castShadow = true;
@@ -170,11 +206,12 @@ function buildFremenCamp(worldState, colliders, interactables) {
   camp.add(canopyMesh);
 
   // --- Fluttering Saffron Fremen Pennant Banner beside camp entrance ---
+  const pennantGy = localGroundY(2.45, 1.45);
   const pennantPole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.036, 3.35, 8),
+    new THREE.CylinderGeometry(0.025, 0.036, 3.45, 8),
     new THREE.MeshStandardMaterial({ color: 0x6b4728, roughness: 0.78 })
   );
-  pennantPole.position.set(2.45, 1.45, 1.45);
+  pennantPole.position.set(2.45, 1.42 + pennantGy * 0.5, 1.45);
   pennantPole.castShadow = true;
   camp.add(pennantPole);
 
@@ -214,8 +251,10 @@ function buildFremenCamp(worldState, colliders, interactables) {
   // --- Hammered Brass Spice-Oil Brazier + Animated Volumetric Flame + PointLight ---
   const brazierX = 0.05;
   const brazierZ = 0.25;
+  const brazierGy = localGroundY(brazierX, brazierZ);
   const brassMat = new THREE.MeshStandardMaterial({
-    color: 0xb68142,
+    color: 0xffffff,
+    vertexColors: true,
     roughness: 0.36,
     metalness: 0.82
   });
@@ -235,40 +274,57 @@ function buildFremenCamp(worldState, colliders, interactables) {
   brazierParts.push(colorize(bowl, 0xb87f3e, 0.06));
   for (let leg = 0; leg < 3; leg++) {
     const a = (leg / 3) * Math.PI * 2;
-    const legGeo = new THREE.CylinderGeometry(0.028, 0.036, 0.56, 7);
+    const legGeo = new THREE.CylinderGeometry(0.028, 0.036, 0.64, 7);
     legGeo.rotateZ(0.22);
     legGeo.rotateY(a);
-    legGeo.translate(Math.cos(a) * 0.32, 0.24, Math.sin(a) * 0.32);
+    legGeo.translate(Math.cos(a) * 0.32, 0.20, Math.sin(a) * 0.32);
     brazierParts.push(colorize(legGeo, 0x4b3526, 0.04));
   }
   const brazierMesh = new THREE.Mesh(mergeGeometries(brazierParts, false), brassMat);
-  brazierMesh.position.set(brazierX, -0.05, brazierZ);
+  brazierMesh.position.set(brazierX, brazierGy - 0.01, brazierZ);
   brazierMesh.castShadow = true;
   brazierMesh.receiveShadow = true;
   camp.add(brazierMesh);
 
-  // Glowing ember bed inside brazier
-  const coalMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 14, 10),
-    new THREE.MeshStandardMaterial({
-      color: 0x2a1208,
-      emissive: new THREE.Color(0xff5212),
-      emissiveIntensity: 2.2,
-      roughness: 0.85
-    })
-  );
+  // Glowing spice-oil ember bed inside brazier (cracked glowing charcoal core — rich glow, zero bloom blowout!)
+  const coalUniforms = { uTime: { value: 0 } };
+  const coalMat = new THREE.MeshStandardMaterial({
+    color: 0x261006,
+    emissive: new THREE.Color(0xff4a10),
+    emissiveIntensity: 1.45,
+    roughness: 0.88
+  });
+  coalMat.customProgramCacheKey = () => 'arrakis-brazier-coal-v1';
+  coalMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = coalUniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCoalLocal;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCoalLocal = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${NOISE_GLSL}\nuniform float uTime;\nvarying vec3 vCoalLocal;`)
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float rCoal = length(vCoalLocal.xz) / 0.32;
+        float crack = fbm2(vCoalLocal.xz * 14.0 + vec2(uTime * 0.15, -uTime * 0.10));
+        float hotCore = (1.0 - smoothstep(0.15, 0.98, rCoal)) * smoothstep(0.26, 0.72, crack);
+        vec3 emberHue = mix(vec3(0.75, 0.14, 0.02), vec3(1.15, 0.56, 0.12), hotCore);
+        totalEmissiveRadiance *= emberHue * (0.38 + 0.82 * hotCore);`
+      );
+  };
+  const coalMesh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), coalMat);
   coalMesh.scale.set(1.0, 0.35, 1.0);
-  coalMesh.position.set(brazierX, 0.46, brazierZ);
+  coalMesh.position.set(brazierX, brazierGy + 0.48, brazierZ);
   camp.add(coalMesh);
 
-  // Volumetric shader flame tongue
+  // Volumetric shader flame tongue (balanced filmic radiance so dusk/night glow stays rich without white clipping)
   const flameUniforms = {
     uTime: { value: 0 },
     uWindDir: { value: new THREE.Vector2(1, 0) },
     uWindSpeed: { value: 0.45 }
   };
-  const flameGeo = new THREE.ConeGeometry(0.28, 0.92, 16, 12, true);
-  flameGeo.translate(0, 0.46, 0);
+  const flameGeo = new THREE.ConeGeometry(0.26, 0.88, 16, 12, true);
+  flameGeo.translate(0, 0.44, 0);
   const flameMat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -279,37 +335,46 @@ function buildFremenCamp(worldState, colliders, interactables) {
       uniform float uTime;
       uniform float uWindSpeed;
       varying vec2 vUv;
+      varying vec3 vNormW;
+      varying vec3 vWorldP;
       void main() {
         vUv = uv;
         vec3 p = position;
         float h = uv.y;
-        p.x += sin(uTime * 11.0 + h * 6.0) * 0.06 * h + uWindSpeed * 0.14 * h * h;
-        p.z += cos(uTime * 9.5 + h * 5.0) * 0.05 * h;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        p.x += sin(uTime * 11.0 + h * 6.0) * 0.055 * h + uWindSpeed * 0.13 * h * h;
+        p.z += cos(uTime * 9.5 + h * 5.0) * 0.045 * h;
+        vec4 wp = modelMatrix * vec4(p, 1.0);
+        vWorldP = wp.xyz;
+        vNormW = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * wp;
       }
     `,
     fragmentShader: /* glsl */ `
       ${NOISE_GLSL}
       uniform float uTime;
       varying vec2 vUv;
+      varying vec3 vNormW;
+      varying vec3 vWorldP;
       void main() {
         float h = vUv.y;
         float n = fbm2(vec2(vUv.x * 4.5, h * 4.2 - uTime * 4.8));
-        float shape = (1.0 - smoothstep(0.05, 0.98, h)) * smoothstep(0.0, 0.16, h);
-        float mask = smoothstep(0.28, 0.72, n + (1.0 - h) * 0.42) * shape;
+        float shape = (1.0 - smoothstep(0.06, 0.96, h)) * smoothstep(0.0, 0.18, h);
+        vec3 viewDir = normalize(cameraPosition - vWorldP);
+        float edgeSoft = pow(abs(dot(normalize(vNormW), viewDir)), 0.55);
+        float mask = smoothstep(0.30, 0.74, n + (1.0 - h) * 0.38) * shape * (0.35 + 0.65 * edgeSoft);
         if (mask < 0.02) discard;
-        vec3 col = mix(vec3(1.0, 0.24, 0.04), vec3(1.0, 0.78, 0.28), smoothstep(0.2, 0.85, (1.0 - h) * n * 1.45));
-        gl_FragColor = vec4(col * 1.65, mask * 0.85);
+        vec3 col = mix(vec3(0.95, 0.20, 0.03), vec3(1.0, 0.66, 0.18), smoothstep(0.22, 0.88, (1.0 - h) * n * 1.42));
+        gl_FragColor = vec4(col * 1.12, mask * 0.64);
       }
     `
   });
   const flameMesh = new THREE.Mesh(flameGeo, flameMat);
-  flameMesh.position.set(brazierX, 0.45, brazierZ);
+  flameMesh.position.set(brazierX, brazierGy + 0.47, brazierZ);
   camp.add(flameMesh);
 
-  // Live flickering fire PointLight (stronger at dusk/night, cozy glow in daylight)
-  const fireLight = new THREE.PointLight(0xff8a38, 6.0, 22.0, 1.7);
-  fireLight.position.set(brazierX, 1.12, brazierZ);
+  // Live flickering fire PointLight (warm golden dusk/night pool without clipping bloom!)
+  const fireLight = new THREE.PointLight(0xff8230, 5.0, 21.0, 1.65);
+  fireLight.position.set(brazierX, brazierGy + 1.06, brazierZ);
   camp.add(fireLight);
 
   // Rising glowing ember sparks from brazier
@@ -319,25 +384,124 @@ function buildFremenCamp(worldState, colliders, interactables) {
   for (let i = 0; i < EMBER_COUNT; i++) {
     emberSeed[i] = Math.random();
     emberPos[i * 3] = brazierX;
-    emberPos[i * 3 + 1] = 0.55;
+    emberPos[i * 3 + 1] = brazierGy + 0.55;
     emberPos[i * 3 + 2] = brazierZ;
   }
   const emberGeo = new THREE.BufferGeometry();
   emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3));
   const emberMat = new THREE.PointsMaterial({
-    color: 0xffb24c,
+    color: 0xffa43c,
     map: getSoftGlowTexture(),
-    size: 0.13,
+    size: 0.105,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.88,
     blending: THREE.AdditiveBlending,
     depthWrite: false
   });
   const emberPoints = new THREE.Points(emberGeo, emberMat);
   camp.add(emberPoints);
 
-  // --- Clay Water Amphorae, Sealed Fremkit Chest & Desert Rug ---
+  // --- Terrain-Conforming Woven Fremen Carpet Runners, Bolsters, Hearth Stones, Amphorae & Fremkit Chest ---
   const propsParts = [];
+
+  // Helper: Build a terrain-conforming woven Fremen desert carpet runner with folded hem & braided end tassels
+  function addWovenCarpetRunner(centerX, centerZ, width, depth, segX, segZ, mainAxis = 'x') {
+    const plane = new THREE.PlaneGeometry(width, depth, segX, segZ);
+    plane.rotateX(-Math.PI * 0.5);
+    const pos = plane.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+
+    const cMadder = new THREE.Color(0x6d2318);
+    const cTerracotta = new THREE.Color(0x9a3d20);
+    const cSaffron = new THREE.Color(0xc8823c);
+    const cIndigo = new THREE.Color(0x281e1c);
+    const cCream = new THREE.Color(0xd8bc92);
+    const col = new THREE.Color();
+
+    for (let i = 0; i < pos.count; i++) {
+      const lx0 = pos.getX(i);
+      const lz0 = pos.getZ(i);
+      const lx = centerX + lx0;
+      const lz = centerZ + lz0;
+      const u = lx0 / (width * 0.5); // -1..1
+      const v = lz0 / (depth * 0.5); // -1..1
+      const edgeMax = Math.max(Math.abs(u), Math.abs(v));
+      const gy = localGroundY(lx, lz);
+      // Softly hug terrain contour with subtle textile undulation; tuck outer edge cleanly into sand (zero floating!)
+      const edgeTuck = edgeMax > 0.94 ? -0.022 : 0.026 + Math.sin(lx * 7.0 + lz * 5.0) * 0.004;
+      pos.setXYZ(i, lx, gy + edgeTuck, lz);
+
+      // Authentic woven Fremen geometric desert pattern
+      const along = mainAxis === 'x' ? u : v;
+      const across = mainAxis === 'x' ? v : u;
+      const borderBand = smoothstep(0.68, 0.78, Math.abs(across)) * (1.0 - smoothstep(0.88, 0.96, Math.abs(across)));
+      const endBand = smoothstep(0.74, 0.84, Math.abs(along)) * (1.0 - smoothstep(0.92, 0.98, Math.abs(along)));
+      // Repeating central diamond lozenges
+      const cellA = Math.abs(((along * 3.5 + 4.0) % 1.0) - 0.5) * 2.0;
+      const cellB = Math.abs(across * 2.2);
+      const diamond = 1.0 - smoothstep(0.55, 0.72, cellA + cellB);
+      const diamondRim = smoothstep(0.46, 0.58, cellA + cellB) * (1.0 - smoothstep(0.62, 0.74, cellA + cellB));
+      const weaveTex = 0.92 + 0.08 * Math.sin(lx * 38.0) * Math.cos(lz * 38.0);
+
+      col.copy(cMadder).lerp(cTerracotta, (Math.sin(across * 9.0) * 0.5 + 0.5) * 0.35);
+      col.lerp(cSaffron, Math.max(borderBand, endBand) * 0.82);
+      col.lerp(cIndigo, diamond * 0.68);
+      col.lerp(cCream, diamondRim * 0.55);
+      if (Math.abs(across) > 0.89 || Math.abs(along) > 0.91) {
+        col.lerp(cIndigo, 0.55);
+      }
+      col.multiplyScalar(weaveTex);
+      colors[i * 3] = col.r;
+      colors[i * 3 + 1] = col.g;
+      colors[i * 3 + 2] = col.b;
+    }
+    plane.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    plane.computeVertexNormals();
+    propsParts.push(plane.index ? plane.toNonIndexed() : plane);
+
+    // Braided warm-cream fringe tassels along both short ends of the runner
+    const tasselCount = mainAxis === 'x' ? 9 : 7;
+    for (const endSign of [-1, 1]) {
+      for (let t = 0; t < tasselCount; t++) {
+        const frac = (t / (tasselCount - 1) - 0.5) * 1.75;
+        const tx = mainAxis === 'x' ? centerX + endSign * (width * 0.5 + 0.055) : centerX + frac * (width * 0.45);
+        const tz = mainAxis === 'x' ? centerZ + frac * (depth * 0.45) : centerZ + endSign * (depth * 0.5 + 0.055);
+        const tgy = localGroundY(tx, tz);
+        const tassel = new THREE.BoxGeometry(mainAxis === 'x' ? 0.11 : 0.022, 0.016, mainAxis === 'x' ? 0.022 : 0.11);
+        tassel.translate(tx, tgy + 0.012, tz);
+        propsParts.push(colorize(tassel, 0xd0b384, 0.08));
+      }
+    }
+  }
+
+  // Main bivouac woven carpet under the awning + hearth-side ceremonial runner beside the brazier
+  addWovenCarpetRunner(-0.28, -0.78, 2.55, 1.36, 20, 12, 'x');
+  addWovenCarpetRunner(-0.82, 0.62, 1.12, 1.46, 10, 14, 'z');
+
+  // Rolled woven Fremen seating bolsters resting on rear carpet
+  for (const [bx, bz, byaw, bHex] of [[-0.92, -1.04, 0.22, 0x8a341d], [0.42, -1.08, -0.26, 0x7c4a26]]) {
+    const bgy = localGroundY(bx, bz);
+    const bolster = new THREE.CylinderGeometry(0.11, 0.11, 0.68, 10);
+    bolster.rotateZ(Math.PI * 0.5);
+    bolster.rotateY(byaw);
+    bolster.translate(bx, bgy + 0.125, bz);
+    propsParts.push(colorize(bolster, bHex, 0.08));
+  }
+
+  // Carved dark sandstone hearth stones anchoring the brazier tripod flush to the dune floor
+  for (let s = 0; s < 8; s++) {
+    const a = (s / 8) * Math.PI * 2 + 0.2;
+    const sx = brazierX + Math.cos(a) * 0.44;
+    const sz = brazierZ + Math.sin(a) * 0.44;
+    const sgy = localGroundY(sx, sz);
+    const stone = new THREE.DodecahedronGeometry(0.11, 0);
+    stone.scale(1.15, 0.55, 0.85);
+    stone.rotateY(a);
+    stone.translate(sx, sgy + 0.02, sz);
+    propsParts.push(colorize(stone, 0x4a392e, 0.09));
+  }
+
+  // Clay Water Amphorae grounded to exact local terrain height
   const amphoraProfile = [
     new THREE.Vector2(0.01, 0.0),
     new THREE.Vector2(0.14, 0.02),
@@ -347,40 +511,188 @@ function buildFremenCamp(worldState, colliders, interactables) {
     new THREE.Vector2(0.13, 0.78),
     new THREE.Vector2(0.08, 0.79)
   ];
-  for (const [ax, az, sc, tilt] of [[-1.35, -0.75, 1.05, 0.05], [-0.92, -0.95, 0.82, -0.06], [1.32, -0.68, 0.92, 0.03]]) {
+  for (const [ax, az, sc, tilt] of [[-1.50, -0.78, 1.05, 0.05], [-1.08, -1.26, 0.82, -0.06], [1.36, -0.70, 0.92, 0.03]]) {
+    const agy = localGroundY(ax, az);
     const jar = new THREE.LatheGeometry(amphoraProfile, 16);
     jar.scale(sc, sc, sc);
     jar.rotateZ(tilt);
-    jar.translate(ax, -0.04, az);
+    jar.translate(ax, agy - 0.03, az);
     propsParts.push(colorize(jar, 0x9c5534, 0.08));
   }
 
-  // Sealed Fremkit Supply Chest
+  // Sealed Fremkit Supply Chest grounded cleanly to terrain slope
+  const chestX = 1.18;
+  const chestZ = 0.68;
+  const chestGy = localGroundY(chestX, chestZ);
   const chest = new THREE.BoxGeometry(0.92, 0.44, 0.54);
   chest.rotateY(-0.28);
-  chest.translate(1.15, 0.19, 0.65);
+  chest.translate(chestX, chestGy + 0.19, chestZ);
   propsParts.push(colorize(chest, 0x4b3b2d, 0.06));
 
   const chestLid = new THREE.BoxGeometry(0.96, 0.08, 0.58);
   chestLid.rotateY(-0.28);
-  chestLid.translate(1.15, 0.44, 0.65);
+  chestLid.translate(chestX, chestGy + 0.44, chestZ);
   propsParts.push(colorize(chestLid, 0x7b5d3e, 0.06));
-
-  // Woven Fremen seating carpet beneath canopy
-  const rug = new THREE.BoxGeometry(2.6, 0.035, 1.85);
-  rug.translate(-0.15, 0.01, -0.52);
-  propsParts.push(colorize(rug, 0x6b281c, 0.09));
 
   const propsMesh = new THREE.Mesh(
     mergeGeometries(propsParts, false),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.82, metalness: 0.08 })
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.84, metalness: 0.06 })
   );
   propsMesh.castShadow = true;
   propsMesh.receiveShadow = true;
   camp.add(propsMesh);
 
+  // --- Hammered Copper Spice-Coffee Dallah, Finjan Cups, Brass Tray, Chest Clasps & Fremen Water-Ring Tokens ---
+  const metalParts = [];
+  const trayX = -0.62;
+  const trayZ = 0.56;
+  const trayGy = localGroundY(trayX, trayZ) + 0.028;
+
+  // Low circular hammered-brass serving tray resting on the woven hearth runner
+  const trayGeo = new THREE.LatheGeometry(
+    [
+      new THREE.Vector2(0.01, 0.0),
+      new THREE.Vector2(0.24, 0.0),
+      new THREE.Vector2(0.275, 0.026),
+      new THREE.Vector2(0.26, 0.030),
+      new THREE.Vector2(0.23, 0.008),
+      new THREE.Vector2(0.01, 0.008)
+    ],
+    22
+  );
+  trayGeo.translate(trayX, trayGy, trayZ);
+  metalParts.push(colorize(trayGeo, 0xb88642, 0.05));
+
+  // Iconic Fremen Copper Spice-Coffee Dallah (curved beak spout, bulbous body, domed finial lid, S-scroll handle)
+  const dallahX = trayX - 0.05;
+  const dallahZ = trayZ - 0.04;
+  const dallahY = trayGy + 0.008;
+  const dallahRotY = -0.35; // Orient crescent spout & handle crisply across the camera sightline
+
+  const dallahBody = new THREE.LatheGeometry(
+    [
+      new THREE.Vector2(0.005, 0.0),
+      new THREE.Vector2(0.064, 0.0),
+      new THREE.Vector2(0.052, 0.035),
+      new THREE.Vector2(0.088, 0.115),
+      new THREE.Vector2(0.082, 0.175),
+      new THREE.Vector2(0.046, 0.232),
+      new THREE.Vector2(0.064, 0.275),
+      new THREE.Vector2(0.055, 0.292),
+      new THREE.Vector2(0.030, 0.335),
+      new THREE.Vector2(0.010, 0.365),
+      new THREE.Vector2(0.001, 0.382)
+    ],
+    18
+  );
+  dallahBody.translate(dallahX, dallahY, dallahZ);
+  metalParts.push(colorize(dallahBody, 0xc86b3a, 0.04));
+
+  // Decorative brass waist collar band on dallah
+  const dallahCollar = new THREE.TorusGeometry(0.052, 0.007, 6, 16);
+  dallahCollar.rotateX(Math.PI * 0.5);
+  dallahCollar.translate(dallahX, dallahY + 0.232, dallahZ);
+  metalParts.push(colorize(dallahCollar, 0xdca554, 0.04));
+
+  // Crescent pouring beak spout
+  const spoutCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.068, 0.145, 0),
+    new THREE.Vector3(0.142, 0.205, 0),
+    new THREE.Vector3(0.195, 0.275, 0),
+    new THREE.Vector3(0.228, 0.298, 0)
+  ]);
+  const spoutGeo = new THREE.TubeGeometry(spoutCurve, 12, 0.015, 8, false);
+  // Taper spout tip smoothly
+  const spPos = spoutGeo.attributes.position;
+  for (let i = 0; i < spPos.count; i++) {
+    const sx = spPos.getX(i);
+    const t = smoothstep(0.07, 0.23, sx);
+    const cyMid = 0.145 + t * 0.153;
+    spPos.setY(i, cyMid + (spPos.getY(i) - cyMid) * (1.0 - t * 0.55));
+    spPos.setZ(i, spPos.getZ(i) * (1.0 - t * 0.58));
+  }
+  spoutGeo.computeVertexNormals();
+  spoutGeo.rotateY(dallahRotY);
+  spoutGeo.translate(dallahX, dallahY, dallahZ);
+  metalParts.push(colorize(spoutGeo, 0xd17642, 0.04));
+
+  // Swept S-scroll brass handle opposite the spout
+  const handleCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.052, 0.268, 0),
+    new THREE.Vector3(-0.135, 0.285, 0),
+    new THREE.Vector3(-0.142, 0.185, 0),
+    new THREE.Vector3(-0.082, 0.105, 0)
+  ]);
+  const handleGeo = new THREE.TubeGeometry(handleCurve, 12, 0.010, 7, false);
+  handleGeo.rotateY(dallahRotY);
+  handleGeo.translate(dallahX, dallahY, dallahZ);
+  metalParts.push(colorize(handleGeo, 0xc89248, 0.04));
+
+  // Two small Fremen spice-coffee finjan cups beside the dallah on the tray
+  const cupProfile = [
+    new THREE.Vector2(0.004, 0.0),
+    new THREE.Vector2(0.022, 0.0),
+    new THREE.Vector2(0.036, 0.052),
+    new THREE.Vector2(0.032, 0.056),
+    new THREE.Vector2(0.018, 0.012),
+    new THREE.Vector2(0.004, 0.012)
+  ];
+  for (const [fx, fz] of [[trayX + 0.12, trayZ + 0.09], [trayX + 0.11, trayZ - 0.08]]) {
+    const cup = new THREE.LatheGeometry(cupProfile, 12);
+    cup.translate(fx, dallahY, fz);
+    metalParts.push(colorize(cup, 0xd29c52, 0.05));
+  }
+
+  // Gleaming Fremen Water-Ring Tokens (sietch liter & dram rings resting beside the brazier & dallah)
+  const waterRingDefs = [
+    { x: -0.35, z: 0.78, r: 0.062, tube: 0.011, rx: Math.PI * 0.5, ry: 0.0, rz: 0.0, yOff: 0.012, hex: 0xdec896 },
+    { x: -0.29, z: 0.74, r: 0.056, tube: 0.010, rx: Math.PI * 0.42, ry: 0.32, rz: 0.16, yOff: 0.028, hex: 0xd0b072 },
+    { x: -0.42, z: 0.85, r: 0.048, tube: 0.0095, rx: Math.PI * 0.5, ry: 0.0, rz: 0.0, yOff: 0.011, hex: 0xe2d0a4 },
+    { x: -0.36, z: 0.87, r: 0.044, tube: 0.009, rx: Math.PI * 0.36, ry: -0.45, rz: 0.28, yOff: 0.026, hex: 0xc9a05c },
+    { x: -0.78, z: 0.82, r: 0.058, tube: 0.0105, rx: Math.PI * 0.5, ry: 0.0, rz: 0.0, yOff: 0.012, hex: 0xdcc48c },
+    { x: -0.73, z: 0.79, r: 0.046, tube: 0.009, rx: Math.PI * 0.38, ry: 0.52, rz: -0.22, yOff: 0.025, hex: 0xe6d6ad }
+  ];
+  for (const wr of waterRingDefs) {
+    const wgy = localGroundY(wr.x, wr.z) + 0.028;
+    const ringGeo = new THREE.TorusGeometry(wr.r, wr.tube, 8, 20);
+    ringGeo.rotateX(wr.rx);
+    ringGeo.rotateY(wr.ry);
+    ringGeo.rotateZ(wr.rz);
+    ringGeo.translate(wr.x, wgy + wr.yOff, wr.z);
+    metalParts.push(colorize(ringGeo, wr.hex, 0.03));
+  }
+
+  // Brass clasp & straps on the Fremkit supply chest
+  for (const sOff of [-0.28, 0.28]) {
+    const strap = new THREE.BoxGeometry(0.055, 0.47, 0.59);
+    strap.translate(sOff, 0.22, 0);
+    strap.rotateY(-0.28);
+    strap.translate(chestX, chestGy, chestZ);
+    metalParts.push(colorize(strap, 0xb88642, 0.05));
+  }
+  const latch = new THREE.BoxGeometry(0.11, 0.12, 0.04);
+  latch.translate(0, 0.38, 0.295);
+  latch.rotateY(-0.28);
+  latch.translate(chestX, chestGy, chestZ);
+  metalParts.push(colorize(latch, 0xd8a858, 0.04));
+
+  const campMetalMesh = new THREE.Mesh(
+    mergeGeometries(metalParts, false),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      roughness: 0.27,
+      metalness: 0.88,
+      clearcoat: 0.24,
+      clearcoatRoughness: 0.24
+    })
+  );
+  campMetalMesh.castShadow = true;
+  campMetalMesh.receiveShadow = true;
+  camp.add(campMetalMesh);
+
   // Register brazier collider & interactable
-  const worldBrazier = new THREE.Vector3(brazierX, 0.6, brazierZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.42).add(new THREE.Vector3(cx, cy, cz));
+  const worldBrazier = new THREE.Vector3(brazierX, brazierGy + 0.6, brazierZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), rotY).add(new THREE.Vector3(cx, cy, cz));
   colliders.push({ x: worldBrazier.x, z: worldBrazier.z, r: 0.72 });
   interactables.push({
     id: 'camp_brazier',
@@ -391,7 +703,7 @@ function buildFremenCamp(worldState, colliders, interactables) {
     prompt: '[E] Warm by Fremen Spice-Oil Brazier',
     onInteract: (state) => {
       state.markDiscovered('camp');
-      state.pushToast('SIETCH SANCTUARY', 'Fremen Desert Bivouac', 'Spiced creosote smoke drifts under the sandstone arch — shelter from Coriolis gusts.');
+      state.pushToast('SIETCH SANCTUARY', 'Fremen Desert Bivouac', 'Spiced creosote smoke and melange coffee drift under the woven awning — shelter from Coriolis gusts.');
     }
   });
 
@@ -402,11 +714,12 @@ function buildFremenCamp(worldState, colliders, interactables) {
     clothUniforms.uWindSpeed.value = state.windSpeed;
     flameUniforms.uTime.value = t;
     flameUniforms.uWindSpeed.value = state.windSpeed;
+    coalUniforms.uTime.value = t;
 
     const nightFactor = 1.0 - smoothstep(-0.08, 0.20, state.sunDir.y);
-    const flicker = 0.84 + 0.16 * Math.sin(t * 15.3) + 0.09 * Math.cos(t * 27.1);
-    fireLight.intensity = (2.8 + nightFactor * 9.5 + state.eclipseStrength * 7.0) * flicker;
-    coalMesh.material.emissiveIntensity = (1.6 + nightFactor * 1.8) * flicker;
+    const flicker = 0.88 + 0.10 * Math.sin(t * 15.3) + 0.06 * Math.cos(t * 27.1);
+    fireLight.intensity = (2.2 + nightFactor * 5.6 + state.eclipseStrength * 4.4) * flicker;
+    coalMesh.material.emissiveIntensity = (1.05 + nightFactor * 0.92 + state.eclipseStrength * 0.65) * flicker;
 
     // Animate rising ember sparks
     const pos = emberGeo.attributes.position.array;
@@ -414,9 +727,9 @@ function buildFremenCamp(worldState, colliders, interactables) {
       const life = (t * (0.48 + emberSeed[i] * 0.45) + emberSeed[i] * 7.0) % 1.0;
       const ang = emberSeed[i] * Math.PI * 2 + t * 1.4;
       const drift = life * (0.18 + state.windSpeed * 0.45);
-      pos[i * 3] = brazierX + Math.cos(ang) * 0.16 * (1.0 - life * 0.4) + state.windDir.x * drift;
-      pos[i * 3 + 1] = 0.54 + life * 1.75;
-      pos[i * 3 + 2] = brazierZ + Math.sin(ang) * 0.16 * (1.0 - life * 0.4) + state.windDir.y * drift;
+      pos[i * 3] = brazierX + Math.cos(ang) * 0.15 * (1.0 - life * 0.4) + state.windDir.x * drift;
+      pos[i * 3 + 1] = brazierGy + 0.54 + life * 1.72;
+      pos[i * 3 + 2] = brazierZ + Math.sin(ang) * 0.15 * (1.0 - life * 0.4) + state.windDir.y * drift;
     }
     emberGeo.attributes.position.needsUpdate = true;
   }
@@ -435,10 +748,15 @@ function buildDownedOrnithopter(colliders, interactables) {
   const oz = -56.0;
   const oy = getGroundHeight(ox, oz);
 
+  const root = new THREE.Group();
+  root.name = 'DownedOrnithopterRoot';
+
   const wreck = new THREE.Group();
   wreck.name = 'DownedOrnithopterWreck';
   wreck.position.set(ox, oy + 0.36, oz);
   wreck.rotation.set(0.14, -2.28, -0.26); // Dramatic canted impact pose half-claimed by dune sand
+  wreck.updateMatrixWorld(true);
+  root.add(wreck);
 
   const hullMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
@@ -485,7 +803,69 @@ function buildDownedOrnithopter(colliders, interactables) {
   tailBoom.translate(0, 0.20, -4.55);
   hullParts.push(colorize(tailBoom, 0x766957, 0.08));
 
-  // Split V-tail stabilizer fins + twin jet-turbine pods + landing skids
+  // Heat-temper gradient palette for exhaust nozzle petals (bronze root -> temper straw -> violet-blue -> scorched cobalt tip)
+  const cHeatRoot = new THREE.Color(0x52453a);
+  const cHeatGold = new THREE.Color(0xb88442);
+  const cHeatViolet = new THREE.Color(0x474a72);
+  const cHeatBlue = new THREE.Color(0x2d446c);
+  const cHeatTip = new THREE.Color(0x212938);
+
+  function addHeatTemperedNozzle(nx, ny, nz, radius, length, petalCount = 12) {
+    // Outer armored exhaust ring
+    const collar = new THREE.CylinderGeometry(radius * 1.08, radius * 1.15, length * 0.36, 12);
+    collar.rotateX(Math.PI * 0.5);
+    collar.translate(nx, ny, nz + length * 0.16);
+    hullParts.push(colorize(collar, 0x5c4d3e, 0.05));
+
+    // Recessed dark exhaust throat core
+    const throat = new THREE.CylinderGeometry(radius * 0.72, radius * 0.72, length * 0.65, 10);
+    throat.rotateX(Math.PI * 0.5);
+    throat.translate(nx, ny, nz - length * 0.12);
+    hullParts.push(colorize(throat, 0x1e1a18, 0.04));
+
+    // Internal radial stator vanes
+    for (let v = 0; v < 6; v++) {
+      const va = (v / 6) * Math.PI * 2;
+      const stator = new THREE.BoxGeometry(0.022, radius * 1.32, length * 0.28);
+      stator.rotateZ(va);
+      stator.translate(nx, ny, nz - length * 0.16);
+      hullParts.push(colorize(stator, 0x3b445c, 0.05));
+    }
+
+    // Overlapping heat-tempered variable-geometry exhaust nozzle petals / vanes
+    const petalW = (Math.PI * 2 * radius * 0.94) / petalCount;
+    for (let p = 0; p < petalCount; p++) {
+      const a = (p / petalCount) * Math.PI * 2;
+      const petal = new THREE.BoxGeometry(petalW, 0.026, length, 1, 1, 5);
+      // Taper trailing edge slightly and curve inward like an articulated turbine petal
+      const pPos = petal.attributes.position;
+      for (let i = 0; i < pPos.count; i++) {
+        const pz = pPos.getZ(i); // +length/2 at root, -length/2 at exhaust tip
+        const uTip = (length * 0.5 - pz) / length; // 0 at root -> 1 at tip
+        pPos.setX(i, pPos.getX(i) * (1.0 - uTip * 0.24));
+        pPos.setY(i, pPos.getY(i) - uTip * uTip * radius * 0.24);
+      }
+      petal.computeVertexNormals();
+      const coloredPetal = colorizeByFn(petal, (_px, _py, pz, outC) => {
+        const uTip = Math.max(0, Math.min(1, (length * 0.5 - pz) / length));
+        if (uTip < 0.28) {
+          outC.copy(cHeatRoot).lerp(cHeatGold, uTip / 0.28);
+        } else if (uTip < 0.62) {
+          outC.copy(cHeatGold).lerp(cHeatViolet, (uTip - 0.28) / 0.34);
+        } else if (uTip < 0.86) {
+          outC.copy(cHeatViolet).lerp(cHeatBlue, (uTip - 0.62) / 0.24);
+        } else {
+          outC.copy(cHeatBlue).lerp(cHeatTip, (uTip - 0.86) / 0.14);
+        }
+      });
+      coloredPetal.translate(0, radius * 0.96, -length * 0.42);
+      coloredPetal.rotateZ(a);
+      coloredPetal.translate(nx, ny, nz);
+      hullParts.push(coloredPetal);
+    }
+  }
+
+  // Split V-tail stabilizer fins + twin jet-turbine pods with heat-tempered nozzle vanes + landing skids
   for (const side of [-1, 1]) {
     const fin = new THREE.BoxGeometry(1.85, 0.075, 0.85);
     fin.rotateZ(side * 0.48);
@@ -493,16 +873,23 @@ function buildDownedOrnithopter(colliders, interactables) {
     fin.translate(side * 0.92, 0.68, -6.95);
     hullParts.push(colorize(fin, 0x52483c, 0.06));
 
-    // Side jet-turbine nacelle + brass exhaust nozzle
-    const pod = new THREE.CylinderGeometry(0.34, 0.45, 2.55, 10);
+    // Side jet-turbine nacelle + forward intake lip + compressor spinner
+    const pod = new THREE.CylinderGeometry(0.36, 0.45, 2.55, 10);
     pod.rotateX(Math.PI * 0.5);
     pod.translate(side * 1.56, -0.06, -1.05);
     hullParts.push(colorize(pod, 0x453d34, 0.05));
 
-    const nozzle = new THREE.CylinderGeometry(0.26, 0.34, 0.42, 10);
-    nozzle.rotateX(Math.PI * 0.5);
-    nozzle.translate(side * 1.56, -0.06, -2.42);
-    hullParts.push(colorize(nozzle, 0x9c723e, 0.05));
+    const intakeRing = new THREE.TorusGeometry(0.34, 0.045, 7, 14);
+    intakeRing.translate(side * 1.56, -0.06, 0.24);
+    hullParts.push(colorize(intakeRing, 0x9b7848, 0.05));
+
+    const spinner = new THREE.ConeGeometry(0.12, 0.30, 8);
+    spinner.rotateX(Math.PI * 0.5);
+    spinner.translate(side * 1.56, -0.06, 0.22);
+    hullParts.push(colorize(spinner, 0x7c6e5c, 0.04));
+
+    // Heat-tempered segmented jet-turbine exhaust nozzle vanes
+    addHeatTemperedNozzle(side * 1.56, -0.06, -2.36, 0.34, 0.58, 12);
 
     // Bent landing strut & skid
     const strut = new THREE.CylinderGeometry(0.065, 0.075, 1.25, 7);
@@ -515,10 +902,17 @@ function buildDownedOrnithopter(colliders, interactables) {
     hullParts.push(colorize(skid, 0x4a4239, 0.05));
   }
 
-  // Dorsal brass wing-hinge mechanical housing & cockpit mullion frame
+  // Dorsal brass wing-hinge mechanical housing, auxiliary heat-tempered turbine vent & cockpit mullion frame
   const spine = new THREE.BoxGeometry(1.04, 0.62, 3.4);
   spine.translate(0, 0.94, -0.35);
   hullParts.push(colorize(spine, 0x987444, 0.06));
+
+  addHeatTemperedNozzle(0, 0.88, -2.08, 0.22, 0.42, 10);
+
+  // Dark cockpit interior bulkhead & instrument dash shroud beneath glass canopy
+  const cockpitDash = new THREE.BoxGeometry(1.18, 0.36, 1.45);
+  cockpitDash.translate(0, 0.44, 1.72);
+  hullParts.push(colorize(cockpitDash, 0x1c1816, 0.04));
 
   for (const ang of [-0.36, 0, 0.36]) {
     const mullion = new THREE.BoxGeometry(0.075, 0.06, 2.2);
@@ -533,23 +927,97 @@ function buildDownedOrnithopter(colliders, interactables) {
   hullMesh.receiveShadow = true;
   wreck.add(hullMesh);
 
-  // Gleaming fractured obsidian-amber cockpit glass canopy (catches PMREM sky reflection!)
-  const glassGeo = new THREE.SphereGeometry(1.08, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.56);
+  // Subtle Distress / Instrument Amber Glint inside the Fractured Cockpit Canopy
+  const consoleParts = [];
+  const mainScreen = new THREE.BoxGeometry(0.56, 0.15, 0.04);
+  mainScreen.rotateX(-0.42);
+  mainScreen.translate(0, 0.69, 2.12);
+  consoleParts.push(colorize(mainScreen, 0xffaa38, 0.02));
+
+  for (const side of [-1, 1]) {
+    const sideGauge = new THREE.BoxGeometry(0.26, 0.11, 0.035);
+    sideGauge.rotateY(side * -0.45);
+    sideGauge.rotateX(-0.32);
+    sideGauge.translate(side * 0.46, 0.65, 1.88);
+    consoleParts.push(colorize(sideGauge, 0xff8624, 0.02));
+  }
+  const warnPip = new THREE.BoxGeometry(0.14, 0.045, 0.035);
+  warnPip.rotateX(-0.35);
+  warnPip.translate(0.12, 0.78, 1.98);
+  consoleParts.push(colorize(warnPip, 0xff521c, 0.02));
+
+  const cockpitGlintMat = new THREE.MeshStandardMaterial({
+    color: 0x261408,
+    vertexColors: true,
+    emissive: new THREE.Color(0xff9224),
+    emissiveIntensity: 0.75,
+    roughness: 0.25
+  });
+  const cockpitConsoleMesh = new THREE.Mesh(mergeGeometries(consoleParts, false), cockpitGlintMat);
+  wreck.add(cockpitConsoleMesh);
+
+  const cockpitLight = new THREE.PointLight(0xff8c28, 0.4, 4.8, 2.0);
+  cockpitLight.position.set(0.05, 0.78, 1.88);
+  wreck.add(cockpitLight);
+
+  // Gleaming fractured obsidian-amber cockpit glass canopy (PMREM reflection + translucent interior amber glint!)
+  const glassGeo = new THREE.SphereGeometry(1.08, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.56);
   glassGeo.scale(0.88, 0.68, 1.88);
   glassGeo.translate(0, 0.48, 1.48);
   const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x1c2a36,
-    roughness: 0.12,
-    metalness: 0.28,
+    color: 0x16242e,
+    roughness: 0.09,
+    metalness: 0.26,
     reflectivity: 1.0,
     clearcoat: 1.0,
-    clearcoatRoughness: 0.06
+    clearcoatRoughness: 0.05,
+    transparent: true,
+    opacity: 0.70
   });
   const glassMesh = new THREE.Mesh(glassGeo, glassMat);
   glassMesh.castShadow = true;
   wreck.add(glassMesh);
 
-  // Articulated Tapered Dragonfly Wings (carbon-titanium leading spar + cross-ribs + translucent golden-smoke membrane!)
+  // Subtle fractured glass spiderweb stress lines hugging the forward-starboard canopy dome
+  const crackParts = [];
+  const crackOrigin = new THREE.Vector3(0.46, 0.88, 2.18);
+  const crackDirs = [
+    new THREE.Vector3(0.28, 0.14, -0.32),
+    new THREE.Vector3(-0.34, 0.18, 0.22),
+    new THREE.Vector3(0.18, -0.18, 0.42),
+    new THREE.Vector3(-0.18, -0.14, -0.46),
+    new THREE.Vector3(0.32, -0.06, 0.12)
+  ];
+  for (const cd of crackDirs) {
+    const pMid = crackOrigin.clone().addScaledVector(cd, 0.52);
+    const pEnd = crackOrigin.clone().add(cd);
+    // Project onto canopy ellipsoid surface slightly proud (+0.015) so cracks glint cleanly
+    for (const pt of [pMid, pEnd]) {
+      const dx = pt.x / 0.96;
+      const dy = (pt.y - 0.48) / 0.74;
+      const dz = (pt.z - 1.48) / 2.04;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      pt.set((dx / len) * 0.965, 0.48 + (dy / len) * 0.745, 1.48 + (dz / len) * 2.045);
+    }
+    const cCurve = new THREE.CatmullRomCurve3([crackOrigin.clone(), pMid, pEnd]);
+    const cGeo = new THREE.TubeGeometry(cCurve, 6, 0.008, 4, false);
+    crackParts.push(colorize(cGeo, 0xd8c9b0, 0.04));
+  }
+  const crackMesh = new THREE.Mesh(
+    mergeGeometries(crackParts, false),
+    new THREE.MeshStandardMaterial({
+      color: 0xe6d7bf,
+      emissive: new THREE.Color(0x523418),
+      emissiveIntensity: 0.35,
+      roughness: 0.16,
+      metalness: 0.42,
+      transparent: true,
+      opacity: 0.62
+    })
+  );
+  wreck.add(crackMesh);
+
+  // Articulated Tapered Dragonfly Wings + Wind-Fluttering Torn Wing Membrane Ribbons!
   const membraneMat = new THREE.MeshPhysicalMaterial({
     color: 0x6e5a42,
     roughness: 0.38,
@@ -559,7 +1027,39 @@ function buildDownedOrnithopter(colliders, interactables) {
     side: THREE.DoubleSide
   });
 
-  function makeWing(length, width, broken = false) {
+  const ribbonUniforms = {
+    uTime: { value: 0 },
+    uWindSpeed: { value: 0.45 }
+  };
+  const tornRibbonMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 0.42,
+    metalness: 0.22,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide
+  });
+  tornRibbonMat.customProgramCacheKey = () => 'arrakis-ornithopter-ribbons-v1';
+  tornRibbonMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = ribbonUniforms.uTime;
+    shader.uniforms.uWindSpeed = ribbonUniforms.uWindSpeed;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWindSpeed;')
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        float uRip = clamp(uv.x, 0.0, 1.0);
+        float phase = position.x * 2.7 + position.z * 3.1;
+        float gust = 0.42 + uWindSpeed * 0.95;
+        float whipY = sin(uRip * 10.5 - uTime * (6.2 + uWindSpeed * 7.8) + phase) * 0.14 * uRip * uRip * gust;
+        float whipZ = cos(uRip * 8.2 - uTime * (4.8 + uWindSpeed * 6.4) + phase * 1.3) * 0.11 * uRip * uRip * gust;
+        transformed.y += whipY - (1.0 - min(1.0, uWindSpeed * 0.85)) * uRip * uRip * 0.10;
+        transformed.z += whipZ;`
+      );
+  };
+
+  function makeWing(length, width, broken = false, seedOffset = 0) {
     const wGroup = new THREE.Group();
     const effLen = broken ? length * 0.62 : length;
     const sparParts = [];
@@ -601,6 +1101,46 @@ function buildDownedOrnithopter(colliders, interactables) {
     memMesh.castShadow = true;
     wGroup.add(memMesh);
 
+    // Wind-fluttering torn wing membrane ribbons streaming from sheared tips & tattered trailing edges
+    const ribbonParts = [];
+    const ribbonSpecs = broken
+      ? [
+          { ax: effLen * 0.96, az: -0.06, len: 1.48, wid: 0.22, yaw: -0.18, droop: -0.08, hex: 0x9b794a },
+          { ax: effLen * 0.92, az: -0.28, len: 1.24, wid: 0.18, yaw: -0.44, droop: -0.14, hex: 0x88673e },
+          { ax: effLen * 0.78, az: -0.52, len: 1.05, wid: 0.16, yaw: -0.78, droop: -0.12, hex: 0xa48252 },
+          { ax: effLen * 0.54, az: -width * 0.74, len: 0.84, wid: 0.14, yaw: -1.12, droop: -0.10, hex: 0x7e603a }
+        ]
+      : [
+          { ax: effLen * 0.42, az: -width * 0.84, len: 0.88, wid: 0.16, yaw: -1.25 + seedOffset * 0.08, droop: -0.10, hex: 0x947346 },
+          { ax: effLen * 0.68, az: -width * 0.80, len: 1.06, wid: 0.18, yaw: -1.12 - seedOffset * 0.06, droop: -0.08, hex: 0xa58352 },
+          { ax: effLen * 0.88, az: -width * 0.58, len: 0.92, wid: 0.15, yaw: -0.82 + seedOffset * 0.05, droop: -0.06, hex: 0x8a6940 }
+        ];
+
+    for (const rs of ribbonSpecs) {
+      const rGeo = new THREE.PlaneGeometry(rs.len, rs.wid, 10, 2);
+      rGeo.rotateX(-Math.PI * 0.5);
+      // Shift so u=0 (x=0) is pinned cleanly to wing anchor and u=1 (x=rs.len) whips freely
+      rGeo.translate(rs.len * 0.5, 0, 0);
+      const rp = rGeo.attributes.position;
+      const ruv = rGeo.attributes.uv;
+      for (let i = 0; i < rp.count; i++) {
+        const u = Math.max(0, Math.min(1, rp.getX(i) / rs.len));
+        ruv.setX(i, u);
+        // Taper to jagged torn ribbon point
+        const taper = (1.0 - u * 0.82) * (0.86 + 0.14 * Math.sin(u * 14.0 + rs.ax));
+        rp.setZ(i, rp.getZ(i) * taper);
+        rp.setY(i, rp.getY(i) + rs.droop * u * u);
+      }
+      rGeo.computeVertexNormals();
+      rGeo.rotateY(rs.yaw);
+      rGeo.translate(rs.ax, 0.01, rs.az);
+      ribbonParts.push(colorize(rGeo, rs.hex, 0.07));
+    }
+
+    const ribbonsMesh = new THREE.Mesh(mergeGeometries(ribbonParts, false), tornRibbonMat);
+    ribbonsMesh.castShadow = true;
+    wGroup.add(ribbonsMesh);
+
     return wGroup;
   }
 
@@ -611,8 +1151,9 @@ function buildDownedOrnithopter(colliders, interactables) {
     { side: -1, z: -0.68, len: 5.2, wid: 0.74, rz: -0.18, ry: 0.48, broken: true }
   ];
   const windWings = [];
-  for (const wc of wingConfigs) {
-    const w = makeWing(wc.len, wc.wid, wc.broken);
+  for (let wi = 0; wi < wingConfigs.length; wi++) {
+    const wc = wingConfigs[wi];
+    const w = makeWing(wc.len, wc.wid, wc.broken, wi);
     w.scale.x = wc.side;
     w.position.set(wc.side * 0.48, 0.96, wc.z);
     w.rotation.set(0.08, wc.ry, wc.rz);
@@ -637,6 +1178,111 @@ function buildDownedOrnithopter(colliders, interactables) {
   beaconLight.position.set(0, 1.48, -1.72);
   wreck.add(beaconLight);
 
+  // --- Wind-Scoured Eolian Sand-Drift Aprons Banking Smoothly Against Fuselage Nose & Skids ---
+  // Extract exact horizontal fuselage axes from wreck quaternion so banks wrap hull & skids seamlessly
+  const fwdAxis = new THREE.Vector3(0, 0, 1).applyQuaternion(wreck.quaternion);
+  fwdAxis.y = 0;
+  fwdAxis.normalize();
+  const rightAxis = new THREE.Vector3(1, 0, 0).applyQuaternion(wreck.quaternion);
+  rightAxis.y = 0;
+  rightAxis.normalize();
+
+  const apronGeo = new THREE.PlaneGeometry(14.5, 14.5, 52, 52);
+  apronGeo.rotateX(-Math.PI * 0.5);
+  const aPos = apronGeo.attributes.position;
+  const aCol = new Float32Array(aPos.count * 3);
+  const cSandBase = new THREE.Color(0xc28344);
+  const cSandCrest = new THREE.Color(0xdba05a);
+  const cSandShadow = new THREE.Color(0x8e5628);
+  const aTmp = new THREE.Color();
+
+  for (let i = 0; i < aPos.count; i++) {
+    const lx = aPos.getX(i);
+    const lz = aPos.getZ(i);
+    const wx = ox + lx;
+    const wz = oz + lz;
+    const baseY = getGroundHeight(wx, wz);
+
+    // Local coordinates aligned with fuselage: u (+fwd nose .. -aft tail), v (+starboard .. -port)
+    const u = lx * fwdAxis.x + lz * fwdAxis.z;
+    const v = lx * rightAxis.x + lz * rightAxis.z;
+
+    // 1. Forward nose impact plow berm cradling chin turret & lower nose bevel (zero floating gap!)
+    const noseBerm = 0.84 * Math.exp(-Math.pow((u - 2.65) / 2.05, 2.0) - Math.pow((v + 0.15) / 2.15, 2.0));
+    // 2. Port landing skid & strut wind-drift apron banking up smoothly around skidL_fwd & skidL_mid
+    const portSkidBank = 0.58 * Math.exp(-Math.pow((u - 1.35) / 2.45, 2.0) - Math.pow((v + 1.52) / 1.48, 2.0));
+    // 3. Starboard camera-facing fuselage flank & buried skid eolian ramp
+    const stbdFlankBank = 0.72 * Math.exp(-Math.pow((u - 0.15) / 3.45, 2.0) - Math.pow((v - 1.55) / 1.95, 2.0));
+    // 4. Wind-swept side dune shoulder streaming downwind along starboard flank
+    const stbdDriftTail = 0.40 * Math.exp(-Math.pow((u + 1.65) / 2.85, 2.0) - Math.pow((v - 2.45) / 1.75, 2.0));
+    // 5. Leeward tail-boom sand tail blending the buried tail boom into the dune crest
+    const tailBank = 0.46 * Math.exp(-Math.pow((u + 3.95) / 3.25, 2.0) - Math.pow((v - 0.35) / 2.05, 2.0));
+
+    // Gentle natural wind-scour ripple modulation across the drift apron
+    const windScour =
+      (Math.sin(u * 1.4 + v * 0.9) * 0.045 + Math.cos(u * 2.8 - v * 2.1) * 0.022) *
+      smoothstep(0.08, 0.55, noseBerm + portSkidBank + stbdFlankBank);
+
+    // Keep port turbine nozzle (u ≈ -2.4, v ≈ -1.56) clearly exposed above the sand
+    const nozzleKeepClear = 1.0 - 0.72 * Math.exp(-Math.pow((u + 2.4) / 1.25, 2.0) - Math.pow((v + 1.55) / 1.15, 2.0));
+
+    const radialDist = Math.hypot(lx, lz);
+    const edgeFade = 1.0 - smoothstep(4.6, 6.9, radialDist);
+    const rawDrift = Math.max(noseBerm, portSkidBank, stbdFlankBank, tailBank) + stbdDriftTail * 0.42;
+    const driftH = Math.max(0, (rawDrift * nozzleKeepClear + windScour) * edgeFade);
+
+    // Tuck perimeter smoothly below dune surface so apron emerges seamlessly with zero visible edge seam
+    const edgeTuck = -0.10 * (1.0 - smoothstep(0.01, 0.14, driftH));
+    aPos.setY(i, baseY + driftH + edgeTuck);
+
+    // Match Great Erg dune sand palette (warm crest highlights + subtle shadow crease against hull)
+    const hullCrease = Math.exp(-Math.pow((u - 0.4) / 3.6, 2.0) - Math.pow(v / 1.35, 2.0));
+    aTmp.copy(cSandBase);
+    aTmp.lerp(cSandCrest, smoothstep(0.18, 0.72, driftH) * 0.45);
+    aTmp.lerp(cSandShadow, hullCrease * 0.24);
+    aCol[i * 3] = aTmp.r;
+    aCol[i * 3 + 1] = aTmp.g;
+    aCol[i * 3 + 2] = aTmp.b;
+  }
+  apronGeo.setAttribute('color', new THREE.BufferAttribute(aCol, 3));
+  apronGeo.computeVertexNormals();
+
+  const apronUniforms = {
+    uWindDir: { value: new THREE.Vector2(0.91, 0.41) }
+  };
+  const sandApronMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 0.91,
+    metalness: 0.0
+  });
+  sandApronMat.customProgramCacheKey = () => 'arrakis-ornithopter-sand-apron-v1';
+  sandApronMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWindDir = apronUniforms.uWindDir;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vApronWorldPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvApronWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${NOISE_GLSL}\nuniform vec2 uWindDir;\nvarying vec3 vApronWorldPos;`)
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        vec2 wD = normalize(uWindDir);
+        vec2 wP = vec2(-wD.y, wD.x);
+        float aAlong = dot(vApronWorldPos.xz, wD);
+        float aCross = dot(vApronWorldPos.xz, wP);
+        float meander = (fbm2(vec2(aAlong * 0.14, aCross * 0.22)) - 0.5) * 0.8;
+        float rip = sin((aAlong + meander) * 20.5) * 0.5 + 0.5;
+        float grain = vnoise2(vApronWorldPos.xz * 26.0) * 0.55 + vnoise2(vApronWorldPos.xz * 58.0) * 0.45;
+        diffuseColor.rgb *= (0.93 + 0.08 * rip + (grain - 0.5) * 0.09);`
+      );
+  };
+  const sandApronMesh = new THREE.Mesh(apronGeo, sandApronMat);
+  sandApronMesh.position.set(ox, 0, oz);
+  sandApronMesh.castShadow = true;
+  sandApronMesh.receiveShadow = true;
+  root.add(sandApronMesh);
+
   colliders.push({ x: ox, z: oz, r: 3.4 });
   interactables.push({
     id: 'ornithopter_blackbox',
@@ -657,6 +1303,10 @@ function buildDownedOrnithopter(colliders, interactables) {
 
   function update(_dt, state) {
     const t = state.elapsed;
+    ribbonUniforms.uTime.value = t;
+    ribbonUniforms.uWindSpeed.value = state.windSpeed;
+    apronUniforms.uWindDir.value.copy(state.windDir);
+
     // Double-pulse distress beacon rhythm
     const cycle = t % 2.4;
     const pulse =
@@ -664,6 +1314,13 @@ function buildDownedOrnithopter(colliders, interactables) {
       Math.exp(-Math.pow((cycle - 0.42) / 0.08, 2)) * 0.72;
     beaconMat.emissiveIntensity = 0.25 + pulse * 5.2;
     beaconLight.intensity = pulse * 10.5;
+
+    // Subtle distress/instrument amber glint inside fractured cockpit canopy at dusk/night
+    const duskNight = 1.0 - smoothstep(-0.08, 0.30, state.sunDir.y);
+    const glintLvl = Math.min(1.0, duskNight + state.eclipseStrength * 0.85);
+    const avionicsHum = 0.88 + 0.08 * Math.sin(t * 7.3) + 0.04 * Math.sin(t * 23.1);
+    cockpitGlintMat.emissiveIntensity = (0.35 + glintLvl * 1.95) * avionicsHum;
+    cockpitLight.intensity = (0.08 + glintLvl * 1.55) * avionicsHum;
 
     // Subtle wind shudder on intact skyward wings
     for (let i = 0; i < windWings.length; i++) {
@@ -673,7 +1330,7 @@ function buildDownedOrnithopter(colliders, interactables) {
     }
   }
 
-  return { group: wreck, update };
+  return { group: root, update };
 }
 
 // ============================================================================
