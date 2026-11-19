@@ -151,6 +151,7 @@ export function createPlayerController({
   let rightMouseDown = false;
   let opticsToggle = false;
   let opticsTargetZoom = 2.6;
+  let forcedCrouch = false;
 
   // Footstep / stride phase tracking
   let stepDistAccum = 0;
@@ -205,9 +206,11 @@ export function createPlayerController({
     pState.thumperAiming = false;
     pState.opticsActive = false;
     pState.opticsZoom = 1.0;
+    pState.opticsTarget = null;
     pState.nearbyPrompt = null;
     opticsToggle = false;
     rightMouseDown = false;
+    forcedCrouch = false;
     aimReticle.group.visible = false;
     soundscape?.setSlideIntensity?.(0);
     if (document.pointerLockElement === domElement) {
@@ -286,7 +289,14 @@ export function createPlayerController({
     pState.glowglobeOn = !pState.glowglobeOn;
     soundscape?.playGlowglobeToggle?.(pState.glowglobeOn);
     if (pState.glowglobeOn) {
-      pState.glowglobePos.copy(pState.position).add(new THREE.Vector3(-0.65, 0.35, -0.75));
+      _forward.set(-Math.sin(pState.yaw), 0, -Math.cos(pState.yaw));
+      _right.set(Math.cos(pState.yaw), 0, -Math.sin(pState.yaw));
+      pState.glowglobePos
+        .copy(pState.position)
+        .addScaledVector(_right, -0.78)
+        .addScaledVector(_forward, 1.85);
+      pState.glowglobePos.y += 0.24;
+      glowglobe.group.position.copy(pState.glowglobePos);
     }
   }
 
@@ -401,6 +411,17 @@ export function createPlayerController({
     }
     keys.add(e.code);
     if (!pState.active) return;
+    if (
+      e.code === 'ControlLeft' ||
+      e.code === 'ControlRight' ||
+      e.code === 'KeyW' ||
+      e.code === 'KeyA' ||
+      e.code === 'KeyS' ||
+      e.code === 'KeyD' ||
+      e.code === 'Space'
+    ) {
+      forcedCrouch = false;
+    }
 
     if (e.code === 'KeyC' && !e.repeat) {
       pState.sandwalking = !pState.sandwalking;
@@ -455,14 +476,47 @@ export function createPlayerController({
 
   function evaluateOpticsScanner() {
     camera.getWorldDirection(_lookDir);
-    const candidates = [
-      {
+    const wormVisible = worldState.worm.phase !== 'patrol' || worldState.thumper.active;
+    const wormSub =
+      worldState.worm.phase === 'breach'
+        ? 'BREACHING · EXTREME HAZARD'
+        : worldState.worm.phase === 'hunting'
+          ? 'WORMSIGN INBOUND'
+          : 'DEEP ERG PATROL';
+    const wormCandidates = [];
+    if (wormVisible) {
+      wormCandidates.push({
         label: 'SHAI-HULUD (ELDER MAKER)',
-        sub: worldState.worm.phase === 'breach' ? 'BREACHING · EXTREME HAZARD' : worldState.worm.phase === 'hunting' ? 'WORMSIGN INBOUND' : 'DEEP ERG PATROL',
+        sub: wormSub,
         pos: worldState.worm.headPos,
         maxAng: 0.26,
-        visible: worldState.worm.phase !== 'patrol' || worldState.thumper.active
-      },
+        visible: true
+      });
+      if (worldState.worm.phase === 'breach') {
+        const bx = worldState.worm.breachOrigin.x;
+        const bz = worldState.worm.breachOrigin.z;
+        const bGround = getGroundHeight(bx, bz);
+        const breachCol = new THREE.Vector3(bx, bGround + 8.5, bz);
+        const breachMid = breachCol.clone().lerp(worldState.worm.headPos, 0.5);
+        wormCandidates.push(
+          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachCol, maxAng: 0.26, visible: true },
+          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachMid, maxAng: 0.26, visible: true }
+        );
+      } else if (worldState.worm.phase === 'hunting') {
+        const wx = worldState.worm.position.x;
+        const wz = worldState.worm.position.z;
+        wormCandidates.push({
+          label: 'SHAI-HULUD (ELDER MAKER)',
+          sub: wormSub,
+          pos: new THREE.Vector3(wx, getGroundHeight(wx, wz) + 3.0, wz),
+          maxAng: 0.24,
+          visible: true
+        });
+      }
+    }
+
+    const candidates = [
+      ...wormCandidates,
       {
         label: 'FREMEN THUMPER',
         sub: worldState.thumper.active ? 'ACTIVE SEISMIC BEACON' : 'DORMANT',
@@ -514,6 +568,161 @@ export function createPlayerController({
     pState.opticsTarget = best;
   }
 
+  function setPose(pose = {}) {
+    pState.active = true;
+    keys.clear();
+    draggingLook = false;
+    rightMouseDown = false;
+
+    const px = typeof pose.x === 'number' ? clamp(pose.x, -168, 168) : pState.feetPosition.x;
+    const pz = typeof pose.z === 'number' ? clamp(pose.z, -198, 72) : pState.feetPosition.z;
+    const gy = getGroundHeight(px, pz);
+    pState.feetPosition.set(px, gy, pz);
+
+    if (typeof pose.yaw === 'number') pState.yaw = pose.yaw;
+    if (typeof pose.pitch === 'number') pState.pitch = clamp(pose.pitch, -1.42, 1.42);
+    pState.sandwalking = Boolean(pose.sandwalking);
+    forcedCrouch = Boolean(pose.crouching);
+    pState.crouching = forcedCrouch;
+    pState.thumperAiming = Boolean(pose.thumperAiming);
+
+    // Reset kinematics & head bob cleanly for crisp deterministic placement
+    pState.velocity.set(0, 0, 0);
+    pState.speed = 0;
+    pState.grounded = true;
+    pState.sprinting = false;
+    pState.sliding = false;
+    pState.slideIntensity = 0;
+    pState.screenShake = 0;
+    pState.nearbyPrompt = null;
+    pState.toastQueue.length = 0;
+    // Mark landmarks already enclosing this posed spawn as known without popping a modal toast over posed captures
+    for (let i = 0; i < ARRAKIS_LANDMARKS.length; i++) {
+      const lm = ARRAKIS_LANDMARKS[i];
+      if (Math.hypot(px - lm.x, pz - lm.z) < lm.radius) {
+        pState.discoveredIds.add(lm.id);
+      }
+    }
+    stepDistAccum = 0;
+    headBobPhase = 0;
+    landingDip = 0;
+    rollAngle = 0;
+    seismicSampleTimer = 0;
+    curEyeHeight = pState.crouching ? CROUCH_EYE_HEIGHT : STAND_EYE_HEIGHT;
+
+    // Immediately classify terrain & Erg status so HUD labels match on frame 0
+    const terrainInfo = getTerrainInfo(px, pz);
+    pState.waterDepth = terrainInfo.waterDepth;
+    pState.inWater = terrainInfo.waterDepth > 0.03;
+    if (pState.inWater) pState.surfaceType = 'water';
+    else if (terrainInfo.rockMask > 0.45) pState.surfaceType = 'rock';
+    else if (terrainInfo.pathMask > 0.40) pState.surfaceType = 'path';
+    else pState.surfaceType = 'sand';
+    pState.onOpenErg = pz < -20.5 && terrainInfo.rockMask < 0.35 && !pState.inWater;
+    const distCamp = Math.hypot(px + 14.5, pz - 5.5);
+    const distArch = Math.hypot(px + 24.5, pz + 1.5);
+    pState.sheltered = distCamp < 4.5 || distArch < 5.5 || (pState.crouching && terrainInfo.rockMask > 0.35);
+
+    pState.position.set(px, gy + curEyeHeight, pz);
+    camera.position.copy(pState.position);
+    _euler.set(pState.pitch, pState.yaw, 0, 'YXZ');
+    camera.quaternion.setFromEuler(_euler);
+    camera.updateMatrixWorld(true);
+
+    // Suspensor Glowglobe: position immediately ahead-left of player for accurate 1-step illumination
+    pState.glowglobeOn = Boolean(pose.glowglobe);
+    glowglobe.group.visible = pState.glowglobeOn;
+    if (pState.glowglobeOn) {
+      const t = worldState.elapsed;
+      _forward.set(-Math.sin(pState.yaw), 0, -Math.cos(pState.yaw));
+      _right.set(Math.cos(pState.yaw), 0, -Math.sin(pState.yaw));
+      pState.glowglobePos
+        .copy(pState.position)
+        .addScaledVector(_right, -0.78)
+        .addScaledVector(_forward, 1.85);
+      pState.glowglobePos.y += 0.24 + Math.sin(t * 2.3) * 0.055;
+      glowglobe.group.position.copy(pState.glowglobePos);
+      glowglobe.ringA.rotation.z = t * 1.4;
+      glowglobe.ringB.rotation.y = -t * 1.1;
+      const nightBoost = 1.0 - THREE.MathUtils.smoothstep(worldState.sunDir.y, -0.10, 0.24);
+      glowglobe.light.intensity = 7.2 + nightBoost * 8.6 + worldState.eclipseStrength * 8.2;
+    }
+
+    // Electro-Optics Binoculars FOV & immediate target scanner lock
+    const wantOptics = Boolean(pose.optics);
+    opticsToggle = wantOptics;
+    opticsTargetZoom = wantOptics ? clamp(pose.opticsZoom || 2.6, 1.6, 5.0) : 2.6;
+    pState.opticsActive = wantOptics;
+    pState.opticsZoom = wantOptics ? opticsTargetZoom : 1.0;
+    camera.fov = 48.0 / pState.opticsZoom;
+    camera.updateProjectionMatrix();
+    if (wantOptics) {
+      evaluateOpticsScanner();
+    } else {
+      pState.opticsTarget = null;
+    }
+
+    // Thumper aim preview sync
+    aimReticle.group.visible = pState.thumperAiming;
+    if (pState.thumperAiming) {
+      raycastAimSand();
+      getGroundNormal(thumperAimPos.x, thumperAimPos.z, _groundNormal);
+      aimReticle.group.position.copy(thumperAimPos);
+      aimReticle.group.position.y += 0.06;
+      aimReticle.group.quaternion.setFromUnitVectors(_up, _groundNormal);
+      aimReticle.outerMat.color.setHex(thumperAimValid ? 0xffcb70 : 0xff4c38);
+    }
+
+    // Pre-fill coherent live seismograph waveform buffer for deterministic static captures
+    pState.wormThreat = 0;
+    pState.seismicPulse = 0;
+    const samples = pState.seismicSamples;
+    const len = samples.length;
+    pState.seismicCursor = 0;
+    const isBreach = worldState.worm.phase === 'breach';
+    const isHunt = worldState.worm.phase === 'hunting';
+    const hasSeismic =
+      worldState.worm.tremor > 0.05 ||
+      worldState.thumper.active ||
+      worldState.worm.phase !== 'patrol';
+
+    if (hasSeismic) {
+      const surfaceGain = pState.onOpenErg ? 1.0 : 0.48;
+      const baseAmp = isBreach
+        ? Math.max(0.78, worldState.worm.tremor)
+        : isHunt
+          ? Math.max(0.58, worldState.worm.tremor)
+          : worldState.thumper.active
+            ? Math.max(0.50, worldState.worm.tremor * 0.85)
+            : clamp(worldState.worm.tremor * surfaceGain, 0.06, 0.72);
+      if (isBreach) {
+        pState.wormThreat = 0.86;
+      } else if (isHunt) {
+        pState.wormThreat = 0.64;
+      } else if (worldState.thumper.active) {
+        pState.wormThreat = pState.onOpenErg ? 0.34 : 0.14;
+      }
+      for (let i = 0; i < len; i++) {
+        const u = i / (len - 1);
+        const packetEnv =
+          0.46 +
+          0.34 * Math.sin(u * Math.PI * 3.0 + 0.55) +
+          0.26 * Math.exp(-Math.pow((u - 0.68) / 0.14, 2.0)) +
+          (worldState.thumper.active ? 0.24 * Math.exp(-Math.pow((u - 0.26) / 0.075, 2.0)) : 0);
+        const carrier =
+          Math.sin(i * 1.42 + 0.4) * 0.60 +
+          Math.sin(i * 2.84 - 0.85) * 0.28 +
+          Math.cos(i * 0.74 + 1.2) * 0.18;
+        samples[i] = clamp(carrier * packetEnv * baseAmp, -0.95, 0.95);
+      }
+    } else {
+      const ambAmp = pState.onOpenErg ? 0.06 : 0.025;
+      for (let i = 0; i < len; i++) {
+        samples[i] = (Math.sin(i * 1.15) * 0.6 + Math.cos(i * 2.3 + 0.7) * 0.4) * ambAmp;
+      }
+    }
+  }
+
   function update(dt) {
     const step = clamp(dt || 0, 0, 0.05);
 
@@ -535,7 +744,7 @@ export function createPlayerController({
       glowglobe.ringA.rotation.z = t * 1.4;
       glowglobe.ringB.rotation.y = -t * 1.1;
       const nightBoost = 1.0 - THREE.MathUtils.smoothstep(worldState.sunDir.y, -0.10, 0.24);
-      glowglobe.light.intensity = 8.0 + nightBoost * 11.0 + worldState.eclipseStrength * 10.0;
+      glowglobe.light.intensity = 7.2 + nightBoost * 8.6 + worldState.eclipseStrength * 8.2;
     }
 
     if (!pState.active) {
@@ -544,7 +753,7 @@ export function createPlayerController({
     }
 
     // 1. Movement inputs
-    pState.crouching = keys.has('ControlLeft') || keys.has('ControlRight');
+    pState.crouching = forcedCrouch || keys.has('ControlLeft') || keys.has('ControlRight');
     const shiftHeld = keys.has('ShiftLeft') || keys.has('ShiftRight');
     const moveFwd = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
     const moveRight = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
@@ -815,10 +1024,11 @@ export function createPlayerController({
     if (seismicSampleTimer >= 0.032) {
       seismicSampleTimer = 0;
       const wormSig = worldState.worm.tremor * (pState.onOpenErg ? 0.95 : 0.35);
+      const wormMult = worldState.worm.phase === 'breach' ? 0.72 : 0.55;
       const thumpSig = worldState.thumper.pulseStrength * 0.65;
       const noiseAmp = pState.onOpenErg ? 0.03 : 0.01;
       const val =
-        (pState.seismicPulse * 0.72 + wormSig * 0.55 + thumpSig * 0.48 + noiseAmp) *
+        (pState.seismicPulse * 0.72 + wormSig * wormMult + thumpSig * 0.48 + noiseAmp) *
         Math.sin(worldState.elapsed * 34.0 + pState.seismicCursor * 1.4);
       pState.seismicSamples[pState.seismicCursor] = clamp(val, -1, 1);
       pState.seismicCursor = (pState.seismicCursor + 1) % pState.seismicSamples.length;
@@ -957,6 +1167,7 @@ export function createPlayerController({
   return {
     enterWalkMode,
     exitWalkMode,
+    setPose,
     requestPointerLock,
     toggleGlowglobe,
     plantThumperAt,
