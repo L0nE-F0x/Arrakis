@@ -203,6 +203,7 @@ export function createPlayerController({
 
   function exitWalkMode() {
     pState.active = false;
+    pState.poseLocked = false;
     pState.thumperAiming = false;
     pState.opticsActive = false;
     pState.opticsZoom = 1.0;
@@ -349,6 +350,7 @@ export function createPlayerController({
   const onMouseDown = (e) => {
     if (!pState.active) return;
     if (e.target !== domElement) return;
+    pState.poseLocked = false;
     soundscape?.ensureStarted?.();
 
     if (e.button === 2) {
@@ -411,6 +413,7 @@ export function createPlayerController({
     }
     keys.add(e.code);
     if (!pState.active) return;
+    pState.poseLocked = false;
     if (
       e.code === 'ControlLeft' ||
       e.code === 'ControlRight' ||
@@ -497,10 +500,16 @@ export function createPlayerController({
         const bz = worldState.worm.breachOrigin.z;
         const bGround = getGroundHeight(bx, bz);
         const breachCol = new THREE.Vector3(bx, bGround + 8.5, bz);
-        const breachMid = breachCol.clone().lerp(worldState.worm.headPos, 0.5);
+        const headRef =
+          worldState.worm.headPos.y > bGround + 4.0
+            ? worldState.worm.headPos
+            : new THREE.Vector3(bx + 8.0, bGround + 26.0, bz + 12.0);
+        const breachMid = breachCol.clone().lerp(headRef, 0.48);
+        const breachUpper = breachCol.clone().lerp(headRef, 0.78);
         wormCandidates.push(
-          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachCol, maxAng: 0.26, visible: true },
-          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachMid, maxAng: 0.26, visible: true }
+          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachCol, maxAng: 0.28, visible: true },
+          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachMid, maxAng: 0.28, visible: true },
+          { label: 'SHAI-HULUD (ELDER MAKER)', sub: wormSub, pos: breachUpper, maxAng: 0.28, visible: true }
         );
       } else if (worldState.worm.phase === 'hunting') {
         const wx = worldState.worm.position.x;
@@ -570,6 +579,7 @@ export function createPlayerController({
 
   function setPose(pose = {}) {
     pState.active = true;
+    pState.poseLocked = true;
     keys.clear();
     draggingLook = false;
     rightMouseDown = false;

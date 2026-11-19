@@ -375,7 +375,8 @@ export function initHud(worldState, cameraController, callbacks = {}) {
     drawCompass();
     drawSeismograph();
 
-    const hideLockHint = p.opticsActive || document.body.classList.contains('screenshot-clean');
+    const hideLockHint =
+      p.opticsActive || Boolean(p.poseLocked) || document.body.classList.contains('screenshot-clean');
     walkLockHint?.classList.toggle('locked', p.pointerLocked);
     walkLockHint?.classList.toggle('hidden', hideLockHint);
 
