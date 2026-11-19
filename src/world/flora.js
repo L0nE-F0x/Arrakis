@@ -884,7 +884,7 @@ function createBotanicalMaterial(sharedUniforms, options = {}) {
   });
 
   mat.customProgramCacheKey = () =>
-    `arrakis-botanical-v3-${isCanopySpray ? 'spray' : 'ground'}-${swayAmp.toFixed(3)}`;
+    `arrakis-botanical-v4-${isCanopySpray ? 'spray' : 'ground'}-${swayAmp.toFixed(3)}`;
 
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = sharedUniforms.uTime;
@@ -895,6 +895,8 @@ function createBotanicalMaterial(sharedUniforms, options = {}) {
     shader.uniforms.uSunIntensity = sharedUniforms.uSunIntensity;
     shader.uniforms.uNight = sharedUniforms.uNight;
     shader.uniforms.uEclipse = sharedUniforms.uEclipse;
+    shader.uniforms.uPlayerPos = sharedUniforms.uPlayerPos;
+    shader.uniforms.uPlayerActive = sharedUniforms.uPlayerActive;
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -903,6 +905,8 @@ function createBotanicalMaterial(sharedUniforms, options = {}) {
         uniform float uTime;
         uniform vec2 uWindDir;
         uniform float uWindSpeed;
+        uniform vec3 uPlayerPos;
+        uniform float uPlayerActive;
         varying vec3 vFloraWorldPos;
         varying vec2 vFloraTagUv;`
       )
@@ -928,7 +932,29 @@ function createBotanicalMaterial(sharedUniforms, options = {}) {
         #ifdef USE_INSTANCING
           floraWp = instanceMatrix * floraWp;
         #endif
-        vFloraWorldPos = (modelMatrix * floraWp).xyz;`
+        vec4 floraWorldFull = modelMatrix * floraWp;
+        ${!isCanopySpray ? `
+        if (uPlayerActive > 0.5) {
+          vec2 toPlant = floraWorldFull.xz - uPlayerPos.xz;
+          float pDist = length(toPlant);
+          if (pDist < 1.55 && pDist > 0.001) {
+            float push = smoothstep(1.55, 0.22, pDist) * clamp(flex, 0.0, 1.2) * 0.58;
+            vec2 pushWorld = (toPlant / pDist) * push;
+            #ifdef USE_INSTANCING
+              vec2 locX = normalize(vec2(instanceMatrix[0].x, instanceMatrix[0].z) + vec2(1e-5));
+              vec2 locZ = normalize(vec2(instanceMatrix[2].x, instanceMatrix[2].z) + vec2(1e-5));
+              transformed.x += dot(pushWorld, locX);
+              transformed.z += dot(pushWorld, locZ);
+            #else
+              transformed.x += pushWorld.x;
+              transformed.z += pushWorld.y;
+            #endif
+            transformed.y -= push * 0.22;
+            floraWorldFull.xz += pushWorld;
+            floraWorldFull.y -= push * 0.22;
+          }
+        }` : ''}
+        vFloraWorldPos = floraWorldFull.xyz;`
       );
 
     shader.fragmentShader = shader.fragmentShader
@@ -1009,7 +1035,9 @@ export function createFloraSystem(scene, worldState) {
     uSunColor: { value: worldState ? worldState.sunColor.clone() : new THREE.Color(0xffcfa0) },
     uSunIntensity: { value: worldState ? worldState.sunIntensity : 3.0 },
     uNight: { value: 0 },
-    uEclipse: { value: worldState ? worldState.eclipseStrength : 0 }
+    uEclipse: { value: worldState ? worldState.eclipseStrength : 0 },
+    uPlayerPos: { value: new THREE.Vector3(0, 0, 14) },
+    uPlayerActive: { value: 0 }
   };
 
   // -------------------------------------------------------------------------
@@ -1581,6 +1609,10 @@ export function createFloraSystem(scene, worldState) {
     sharedUniforms.uSunIntensity.value = worldState.sunIntensity;
     sharedUniforms.uNight.value = 1.0 - smoothstep(-0.14, 0.06, worldState.sunDir.y);
     sharedUniforms.uEclipse.value = worldState.eclipseStrength;
+    if (worldState.player) {
+      sharedUniforms.uPlayerPos.value.copy(worldState.player.feetPosition);
+      sharedUniforms.uPlayerActive.value = worldState.player.active ? 1.0 : 0.0;
+    }
   }
 
   return { group, update };

@@ -947,6 +947,260 @@ function buildCoriolisHaboobSystem() {
   return { group: container, update };
 }
 
+// ============================================================================
+// 5. GPU-ANIMATED BLOWING SALTATION SAND & SUNLIT OASIS DUST MOTES
+//    Wraps seamlessly around camera in 3D space so walking/flying feels alive!
+// ============================================================================
+
+function buildBlowingSandAndMotes() {
+  const MAX_PARTICLES = 1800;
+  const rand = mulberry32(4242);
+  const positions = new Float32Array(MAX_PARTICLES * 3);
+  const seeds = new Float32Array(MAX_PARTICLES * 3);
+
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    positions[i * 3] = (rand() - 0.5) * 34.0;
+    positions[i * 3 + 1] = rand() * 8.5;
+    positions[i * 3 + 2] = (rand() - 0.5) * 34.0;
+    seeds[i * 3] = rand();
+    seeds[i * 3 + 1] = rand();
+    seeds[i * 3 + 2] = rand();
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 3));
+
+  const uniforms = {
+    uTime: { value: 0 },
+    uCamPos: { value: new THREE.Vector3(0, 2, 14) },
+    uWindDir: { value: new THREE.Vector2(1, 0) },
+    uWindSpeed: { value: 0.45 },
+    uStorm: { value: 0 },
+    uSpice: { value: 0 },
+    uSunColor: { value: new THREE.Color(0xffcfa0) },
+    uSunUp: { value: 0.5 },
+    uDensity: { value: 1.0 }
+  };
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms,
+    vertexShader: /* glsl */ `
+      attribute vec3 aSeed;
+      uniform float uTime;
+      uniform vec3 uCamPos;
+      uniform vec2 uWindDir;
+      uniform float uWindSpeed;
+      uniform float uStorm;
+      uniform float uDensity;
+
+      varying float vAlpha;
+      varying float vSeed;
+
+      void main() {
+        vSeed = aSeed.x;
+        // Thin out smoothly on lower quality tiers
+        float activeGate = step(aSeed.z, clamp(uDensity, 0.0, 1.0));
+        float span = 34.0;
+        float hSpan = 8.5;
+
+        float driftRate = mix(0.45, 7.2, clamp(uWindSpeed * 0.55 + uStorm * 0.85, 0.0, 1.3));
+        vec2 windFlow = uWindDir * (uTime * driftRate * (0.65 + 0.7 * aSeed.y));
+        float bob = sin(uTime * (0.9 + aSeed.x * 1.6) + aSeed.y * 6.283) * (0.28 - uStorm * 0.16);
+
+        vec3 rel;
+        rel.x = mod(position.x + windFlow.x - uCamPos.x + span * 0.5, span) - span * 0.5;
+        rel.z = mod(position.z + windFlow.y - uCamPos.z + span * 0.5, span) - span * 0.5;
+        rel.y = mod(position.y + bob - (uCamPos.y - 2.2) + hSpan, hSpan) - 2.2;
+
+        vec3 wp = uCamPos + rel;
+        vec4 mvPos = viewMatrix * vec4(wp, 1.0);
+        float dist = length(mvPos.xyz);
+
+        float edgeFade = smoothstep(17.0, 10.0, length(rel.xz)) * smoothstep(0.65, 2.2, dist);
+        float visStrength = mix(0.24, 0.78, clamp(uStorm * 0.85 + (uWindSpeed - 0.35) * 0.45, 0.0, 1.0));
+        vAlpha = edgeFade * visStrength * activeGate * (0.55 + 0.45 * sin(uTime * 2.1 + aSeed.x * 20.0));
+
+        float baseSize = mix(14.0, 26.0, aSeed.y) * mix(1.0, 1.55, uStorm);
+        gl_PointSize = clamp(baseSize / max(dist, 0.6), 1.2, 10.0);
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uSunColor;
+      uniform float uSunUp;
+      uniform float uStorm;
+      uniform float uSpice;
+      varying float vAlpha;
+      varying float vSeed;
+
+      void main() {
+        if (vAlpha < 0.01) discard;
+        vec2 d = gl_PointCoord - 0.5;
+        float r2 = dot(d, d);
+        if (r2 > 0.25) discard;
+        float soft = exp(-r2 * 15.0);
+
+        vec3 goldenMote = mix(vec3(0.95, 0.72, 0.44), uSunColor * 1.15, 0.55);
+        vec3 stormGrit = vec3(0.76, 0.46, 0.24);
+        vec3 nightMote = vec3(0.45, 0.66, 0.94);
+        vec3 col = mix(nightMote, goldenMote, uSunUp);
+        col = mix(col, stormGrit, uStorm * 0.75);
+        if (uSpice > 0.05 && vSeed > 0.68) {
+          col = mix(col, vec3(0.32, 0.74, 1.15), uSpice * 0.7);
+        }
+
+        gl_FragColor = vec4(col, soft * vAlpha * 0.62);
+      }
+    `
+  });
+
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  points.renderOrder = 7;
+
+  function update(_dt, state, camera) {
+    if (!state || !camera) return;
+    const q = state.getQualityConfig?.();
+    uniforms.uTime.value = state.elapsed;
+    uniforms.uCamPos.value.copy(camera.position);
+    uniforms.uWindDir.value.copy(state.windDir);
+    uniforms.uWindSpeed.value = state.windSpeed;
+    uniforms.uStorm.value = state.weatherWeights.coriolisStorm;
+    uniforms.uSpice.value = Math.max(state.weatherWeights.spiceBlow, state.player?.spiceTrance || 0);
+    uniforms.uSunColor.value.copy(state.sunColor);
+    uniforms.uSunUp.value = smoothstep(-0.08, 0.18, state.sunDir.y) * (1.0 - state.eclipseStrength * 0.7);
+    uniforms.uDensity.value = Math.min(1.0, (q?.particleScale ?? 1.0) * 0.85);
+  }
+
+  return { group: points, update };
+}
+
+// ============================================================================
+// 6. INTERACTIVE FOOTSTEP, SAND-SLIDE, THUMPER & SPICE HARVEST DUST PUFFS
+// ============================================================================
+
+function buildInteractiveSandPuffs() {
+  const POOL_SIZE = 56;
+  const geo = new THREE.IcosahedronGeometry(0.42, 1);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xdca46e,
+    transparent: true,
+    opacity: 0.44,
+    depthWrite: false
+  });
+  const im = new THREE.InstancedMesh(geo, mat, POOL_SIZE);
+  im.frustumCulled = false;
+  im.renderOrder = 6;
+
+  const pool = Array.from({ length: POOL_SIZE }, () => ({
+    active: false,
+    x: 0,
+    y: -100,
+    z: 0,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    age: 0,
+    life: 1,
+    baseScale: 0.5,
+    color: new THREE.Color(0xd9a16b)
+  }));
+  let cursor = 0;
+  const dummy = new THREE.Object3D();
+
+  // Initialize hidden
+  for (let i = 0; i < POOL_SIZE; i++) {
+    dummy.position.set(0, -100, 0);
+    dummy.scale.setScalar(0.0001);
+    dummy.updateMatrix();
+    im.setMatrixAt(i, dummy.matrix);
+    im.setColorAt(i, pool[i].color);
+  }
+  im.instanceMatrix.needsUpdate = true;
+  if (im.instanceColor) im.instanceColor.needsUpdate = true;
+
+  function spawnSandPuff(x, y, z, vx = 0, vy = 0.6, vz = 0, scale = 0.55, hexColor = 0xd9a16b) {
+    const p = pool[cursor];
+    cursor = (cursor + 1) % POOL_SIZE;
+    p.active = true;
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    p.vx = vx;
+    p.vy = vy;
+    p.vz = vz;
+    p.age = 0;
+    p.life = 0.65 + Math.random() * 0.55;
+    p.baseScale = scale;
+    p.color.setHex(hexColor);
+    im.setColorAt(cursor === 0 ? POOL_SIZE - 1 : cursor - 1, p.color);
+    if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  }
+
+  function spawnSpiceBurst(x, y, z) {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4;
+      const spd = 0.6 + Math.random() * 1.4;
+      spawnSandPuff(
+        x + Math.cos(a) * 0.25,
+        y + 0.15,
+        z + Math.sin(a) * 0.25,
+        Math.cos(a) * spd,
+        1.1 + Math.random() * 1.6,
+        Math.sin(a) * spd,
+        0.42 + Math.random() * 0.35,
+        i % 3 === 0 ? 0x4caaff : 0xd46a2c
+      );
+    }
+  }
+
+  function update(dt, state) {
+    const step = clamp(dt || 0, 0, 0.1);
+    let anyDirty = false;
+    const wx = state ? state.windDir.x * state.windSpeed * 2.2 : 0;
+    const wz = state ? state.windDir.y * state.windSpeed * 2.2 : 0;
+    const sunUp = state ? smoothstep(-0.08, 0.20, state.sunDir.y) : 0.6;
+    mat.opacity = mix(0.18, 0.42, sunUp);
+
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const p = pool[i];
+      if (!p.active) continue;
+      anyDirty = true;
+      p.age += step;
+      if (p.age >= p.life) {
+        p.active = false;
+        dummy.position.set(0, -100, 0);
+        dummy.scale.setScalar(0.0001);
+        dummy.updateMatrix();
+        im.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+      const u = p.age / p.life;
+      p.x += (p.vx + wx * 0.4) * step;
+      p.y += p.vy * step;
+      p.z += (p.vz + wz * 0.4) * step;
+      p.vx *= Math.exp(-step * 2.2);
+      p.vz *= Math.exp(-step * 2.2);
+      p.vy -= 1.2 * step;
+
+      const s = p.baseScale * (0.45 + u * 1.75) * Math.sin((1.0 - u) * Math.PI * 0.5);
+      dummy.position.set(p.x, p.y, p.z);
+      dummy.rotation.set(u * 2.2 + i, u * 1.7, i * 0.7);
+      dummy.scale.set(s * 1.25, s * 0.82, s * 1.25);
+      dummy.updateMatrix();
+      im.setMatrixAt(i, dummy.matrix);
+    }
+    if (anyDirty) {
+      im.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  return { group: im, spawnSandPuff, spawnSpiceBurst, update };
+}
+
 export function createAtmosphereFXSystem(scene, worldState) {
   const group = new THREE.Group();
   group.name = 'ArrakisAtmosphereFXSystem';
@@ -955,11 +1209,15 @@ export function createAtmosphereFXSystem(scene, worldState) {
   const dustDevils = buildDustDevilsSystem(worldState);
   const spiceBlow = buildSpiceBlowSystem();
   const coriolisHaboob = buildCoriolisHaboobSystem();
+  const blowingSand = buildBlowingSandAndMotes();
+  const sandPuffs = buildInteractiveSandPuffs();
 
   group.add(cisternMist.group);
   group.add(dustDevils.group);
   group.add(spiceBlow.group);
   group.add(coriolisHaboob.group);
+  group.add(blowingSand.group);
+  group.add(sandPuffs.group);
 
   if (scene) {
     scene.add(group);
@@ -970,7 +1228,14 @@ export function createAtmosphereFXSystem(scene, worldState) {
     dustDevils.update(dt, worldState);
     spiceBlow.update(dt, worldState);
     coriolisHaboob.update(dt, worldState, camera);
+    blowingSand.update(dt, worldState, camera);
+    sandPuffs.update(dt, worldState);
   }
 
-  return { group, update };
+  return {
+    group,
+    spawnSandPuff: sandPuffs.spawnSandPuff,
+    spawnSpiceBurst: sandPuffs.spawnSpiceBurst,
+    update
+  };
 }

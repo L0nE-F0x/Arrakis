@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const _camForward = new THREE.Vector3();
 const _horizonWorld = new THREE.Vector3();
+const _sunWorld = new THREE.Vector3();
 const _sizeVec = new THREE.Vector2();
 
 const ArrakisAtmoShader = {
@@ -20,7 +21,14 @@ const ArrakisAtmoShader = {
     uLightning: { value: 0 },
     uHorizonY: { value: 0.48 },
     uNight: { value: 0 },
-    uEclipse: { value: 0 }
+    uEclipse: { value: 0 },
+    uSunScreenPos: { value: new THREE.Vector2(0.5, 0.5) },
+    uSunShaftStrength: { value: 0.0 },
+    uSunColor: { value: new THREE.Color(0xffcfa0) },
+    uGodRaySamples: { value: 20.0 },
+    uSpiceTrance: { value: 0.0 },
+    uStormExposure: { value: 0.0 },
+    uOptics: { value: 0.0 }
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -39,6 +47,13 @@ const ArrakisAtmoShader = {
     uniform float uHorizonY;
     uniform float uNight;
     uniform float uEclipse;
+    uniform vec2 uSunScreenPos;
+    uniform float uSunShaftStrength;
+    uniform vec3 uSunColor;
+    uniform float uGodRaySamples;
+    uniform float uSpiceTrance;
+    uniform float uStormExposure;
+    uniform float uOptics;
     varying vec2 vUv;
 
     float hash12(vec2 p) {
@@ -68,10 +83,10 @@ const ArrakisAtmoShader = {
         sampleUv = clamp(sampleUv + shimmerOffset, vec2(0.0005), vec2(0.9995));
       }
 
-      // 2. Subtle optical chromatic rim dispersion near frame edges
+      // 2. Subtle optical chromatic rim dispersion near frame edges (amplified slightly in spice trance / optics)
       vec2 centered = vUv - 0.5;
       float r2 = dot(centered, centered);
-      float disp = (0.00085 + uStorm * 0.00065 + uMirage * 0.00035) * r2;
+      float disp = (0.00085 + uStorm * 0.00065 + uMirage * 0.00035 + uSpiceTrance * 0.0018 + uOptics * 0.0009) * r2;
 
       vec2 uvR = clamp(sampleUv + centered * disp, vec2(0.0005), vec2(0.9995));
       vec2 uvB = clamp(sampleUv - centered * disp, vec2(0.0005), vec2(0.9995));
@@ -81,32 +96,99 @@ const ArrakisAtmoShader = {
       float b = texture2D(tDiffuse, uvB).b;
       vec3 color = vec3(r, gTex.g, b);
 
-      // 3. Dry static lightning upper-atmosphere scatter tint during Coriolis Storm
+      // 3. Screen-Space Volumetric Crepuscular Sun Shafts (God Rays) streaming past Windtrap, Tamarisks & Yardangs!
+      if (uSunShaftStrength > 0.004) {
+        vec2 toSun = uSunScreenPos - sampleUv;
+        float sunDist = length(toSun);
+        float radialFalloff = exp(-sunDist * 1.12);
+        if (radialFalloff > 0.01) {
+          float jitter = hash12(gl_FragCoord.xy + fract(uTime * 7.3) * 19.0);
+          int steps = int(clamp(uGodRaySamples, 8.0, 28.0));
+          float fSteps = float(steps);
+          vec2 deltaUv = (toSun / fSteps) * 0.78;
+          vec2 rayUv = sampleUv + deltaUv * jitter;
+          float illuminationDecay = 1.0;
+          float accum = 0.0;
+          float weightSum = 0.0001;
+
+          for (int i = 0; i < 28; i++) {
+            if (i >= steps) break;
+            rayUv += deltaUv;
+            if (rayUv.x >= 0.0 && rayUv.x <= 1.0 && rayUv.y >= 0.0 && rayUv.y <= 1.0) {
+              vec3 sCol = texture2D(tDiffuse, rayUv).rgb;
+              float sLuma = dot(sCol, vec3(0.2126, 0.7152, 0.0722));
+              // Select luminous sky & sun-gap pixels while silhouettes (trees, windtrap, cliffs) cast real shafts!
+              float skyGate = smoothstep(0.48, 1.05, sLuma);
+              accum += skyGate * illuminationDecay;
+              weightSum += illuminationDecay;
+            }
+            illuminationDecay *= 0.95;
+          }
+
+          float shaft = (accum / weightSum) * radialFalloff * uSunShaftStrength;
+          vec3 rayTint = mix(
+            mix(uSunColor, vec3(1.0, 0.76, 0.40), 0.40),
+            vec3(0.55, 0.76, 1.05),
+            uEclipse * 0.85
+          );
+          color += rayTint * shaft * 0.64;
+
+          // Subtle cinematic anamorphic warm lens streak across Canopus at low golden elevation
+          float anamY = exp(-abs(sampleUv.y - uSunScreenPos.y) * 52.0);
+          float anamX = exp(-abs(sampleUv.x - uSunScreenPos.x) * 3.6);
+          color += rayTint * anamY * anamX * uSunShaftStrength * 0.095 * (1.0 - uStorm * 0.85);
+        }
+      }
+
+      // 4. Dry static lightning upper-atmosphere scatter tint during Coriolis Storm
       if (uLightning > 0.001) {
         float skyGrad = smoothstep(0.18, 0.94, vUv.y);
         color *= 1.0 + uLightning * 0.14;
         color += vec3(0.76, 0.85, 1.12) * uLightning * (0.07 + 0.15 * skyGrad);
       }
 
-      // 4. Subtle Mélange spice atmospheric warmth & sheen
+      // 5. Mélange Spice warmth + "Eyes of Ibad" Prescient Trance Rim Aura on harvest
       if (uSpice > 0.01) {
         color = mix(color, color * vec3(1.045, 0.965, 0.945), uSpice * 0.45);
       }
+      if (uSpiceTrance > 0.005) {
+        float edgeRing = smoothstep(0.22, 0.72, length(centered));
+        vec3 ibadBlue = vec3(0.22, 0.68, 1.25);
+        color += ibadBlue * edgeRing * uSpiceTrance * 0.14;
+        // Subtle contrast & clarity pop during spice trance
+        color = mix(color, color * vec3(1.04, 1.03, 1.09), uSpiceTrance * 0.35);
+      }
 
-      // 5. Subtle warm cinema vignette (preserves foreground shadow readability at dawn/night)
+      // 6. Coriolis Storm Visor Sand-Lash Haze when walking exposed in storm
+      if (uStormExposure > 0.01) {
+        float edgeSand = smoothstep(0.25, 0.78, length(centered));
+        float streak = sin(vUv.y * 55.0 + uTime * 22.0 + vUv.x * 18.0) * 0.5 + 0.5;
+        vec3 gritCol = vec3(0.56, 0.31, 0.15);
+        color = mix(color, gritCol, edgeSand * uStormExposure * (0.28 + 0.14 * streak));
+      }
+
+      // 7. Subtle warm cinema vignette + Electro-Optics binocular dark border when zooming
       vec2 vigCoord = centered * vec2(1.0, 0.88);
       float vigDist = length(vigCoord);
       float vig = smoothstep(0.46, 1.05, vigDist) * (0.12 + uStorm * 0.14);
       vec3 vigTint = mix(vec3(1.0), vec3(0.78, 0.68, 0.60), vig);
       color *= vigTint;
 
-      // 6. Subtle natural 35mm film grain + 8-bit sky/horizon dither (velvety-clean in darks, zero speckle)
+      if (uOptics > 0.01) {
+        float lensR = length(centered * vec2(1.18, 1.0));
+        float opticMask = 1.0 - smoothstep(0.42, 0.58, lensR) * 0.88 * uOptics;
+        color *= opticMask;
+        // Crisp optical contrast boost
+        color = mix(color, color * vec3(1.03, 1.02, 0.99), uOptics * 0.4);
+      }
+
+      // 8. Subtle natural 35mm film grain + 8-bit sky/horizon dither (velvety-clean in darks, zero speckle)
       float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
       float lumaWeight = smoothstep(0.03, 0.30, luma);
       float n = hash12(gl_FragCoord.xy + vec2(fract(uTime * 19.7) * 513.0, fract(uTime * 11.3) * 389.0));
       float dither = (hash12(gl_FragCoord.xy) - 0.5) * 0.0014 * mix(0.25, 1.0, lumaWeight);
       float darkScene = clamp(max(uNight, uEclipse), 0.0, 1.0);
-      float baseAmp = mix(0.009 + uStorm * 0.005, 0.0045 + uStorm * 0.003, darkScene);
+      float baseAmp = mix(0.0085 + uStorm * 0.005, 0.0042 + uStorm * 0.003, darkScene);
       float grainAmp = baseAmp * mix(0.20, 1.0, lumaWeight);
       color = max(vec3(0.0), color + (n - 0.5) * grainAmp + dither);
 
@@ -119,7 +201,8 @@ export function createPostProcess(renderer, scene, camera, worldState) {
   renderer.info.autoReset = false;
 
   const composer = new EffectComposer(renderer);
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const qCfg = worldState?.getQualityConfig?.() || { pixelRatioCap: 2.0, godRaySamples: 20 };
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, qCfg.pixelRatioCap);
   composer.setPixelRatio(pixelRatio);
 
   renderer.getSize(_sizeVec);
@@ -143,16 +226,23 @@ export function createPostProcess(renderer, scene, camera, worldState) {
   composer.addPass(outputPass);
 
   function setSize(w, h) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cap = worldState?.getQualityConfig?.().pixelRatioCap || 2.0;
+    const dpr = Math.min(window.devicePixelRatio || 1, cap);
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h);
     composer.setPixelRatio(dpr);
     composer.setSize(w, h);
   }
 
+  function applyQuality() {
+    setSize(window.innerWidth, window.innerHeight);
+  }
+
   function updateUniforms() {
     const u = atmoPass.uniforms;
+    const q = worldState?.getQualityConfig?.() || { godRaySamples: 20 };
     u.uTime.value = worldState.elapsed;
+    u.uGodRaySamples.value = q.godRaySamples;
 
     // Combine explicit mirage weather with mild midday desert shimmer
     const noonSunHeat = THREE.MathUtils.clamp((worldState.sunDir.y - 0.45) * 0.7, 0, 0.35);
@@ -166,14 +256,25 @@ export function createPostProcess(renderer, scene, camera, worldState) {
     u.uLightning.value = worldState.lightningFlash;
     u.uNight.value = 1.0 - THREE.MathUtils.smoothstep(worldState.sunDir.y, -0.14, 0.08);
     u.uEclipse.value = worldState.eclipseStrength;
+    u.uSunColor.value.copy(worldState.sunColor);
 
-    // Accent lightning & peak eclipse diamond/inner-limb radiance without painting a circular white bloom halo
+    u.uSpiceTrance.value = worldState.player?.spiceTrance || 0;
+    u.uStormExposure.value = worldState.player?.active ? (worldState.player.stormExposure || 0) : 0;
+    u.uOptics.value = worldState.player?.active
+      ? THREE.MathUtils.clamp((worldState.player.opticsZoom - 1.0) / 2.2, 0, 1)
+      : 0;
+
+    // Crisp selective bloom (slightly heightened during spice trance or lightning)
     const eclipse = worldState.eclipseStrength;
-    bloomPass.strength = 0.34 + worldState.lightningFlash * 0.07 - eclipse * 0.14;
+    bloomPass.strength =
+      0.34 +
+      worldState.lightningFlash * 0.07 +
+      (worldState.player?.spiceTrance || 0) * 0.08 -
+      eclipse * 0.14;
     bloomPass.radius = 0.45 - eclipse * 0.15;
     bloomPass.threshold = 0.88 + eclipse * 0.28;
 
-    // Compute exact screen-space horizon Y from camera orientation
+    // Screen-space horizon Y & Canopus Sun Screen Projection for Volumetric Crepuscular God Rays
     camera.getWorldDirection(_camForward);
     _horizonWorld.set(_camForward.x, 0, _camForward.z);
     if (_horizonWorld.lengthSq() < 1e-4) {
@@ -182,6 +283,37 @@ export function createPostProcess(renderer, scene, camera, worldState) {
     _horizonWorld.normalize().multiplyScalar(500).add(camera.position);
     _horizonWorld.project(camera);
     u.uHorizonY.value = THREE.MathUtils.clamp(_horizonWorld.y * 0.5 + 0.5, -0.25, 1.25);
+
+    const sunFacing = _camForward.dot(worldState.sunDir);
+    const sunAbove = THREE.MathUtils.smoothstep(worldState.sunDir.y, -0.02, 0.08);
+    // Low golden-hour & dawn angles cast the most dramatic volumetric crepuscular rays; softer at harsh high noon
+    const lowSunDrama = 1.0 - THREE.MathUtils.smoothstep(worldState.sunDir.y, 0.28, 0.65) * 0.52;
+    const stormAtten = 1.0 - worldState.weatherWeights.coriolisStorm * 0.88;
+    const facingGate = THREE.MathUtils.smoothstep(sunFacing, 0.12, 0.68);
+    const shaftStrength =
+      facingGate *
+      sunAbove *
+      lowSunDrama *
+      stormAtten *
+      (0.55 + worldState.eclipseStrength * 0.22);
+
+    if (shaftStrength > 0.002) {
+      _sunWorld.copy(camera.position).addScaledVector(worldState.sunDir, 450);
+      _sunWorld.project(camera);
+      const sx = _sunWorld.x * 0.5 + 0.5;
+      const sy = _sunWorld.y * 0.5 + 0.5;
+      const offscreenFade =
+        1.0 -
+        THREE.MathUtils.smoothstep(
+          Math.max(Math.abs(sx - 0.5), Math.abs(sy - 0.5)),
+          0.48,
+          1.05
+        );
+      u.uSunScreenPos.value.set(sx, sy);
+      u.uSunShaftStrength.value = shaftStrength * offscreenFade;
+    } else {
+      u.uSunShaftStrength.value = 0.0;
+    }
   }
 
   function render(dt = 0.016) {
@@ -193,6 +325,7 @@ export function createPostProcess(renderer, scene, camera, worldState) {
   return {
     composer,
     setSize,
+    applyQuality,
     render
   };
 }

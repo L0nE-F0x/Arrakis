@@ -422,9 +422,18 @@ function buildMuadDibCreature() {
   container.add(root);
   container.add(aoMesh);
 
-  function update(_dt, state) {
+  let curOffsetX = 0;
+  let curOffsetZ = 0;
+  let targetOffsetX = 0;
+  let targetOffsetZ = 0;
+  let startleHopTimer = 0;
+  let happyHopTimer = 0;
+  let wasFed = false;
+
+  function update(dt, state) {
     if (!state) return;
     const t = state.elapsed;
+    const step = Math.min(Math.max(dt || 0, 0), 0.1);
     furUniforms.uSunDir.value.copy(state.sunDir);
     furUniforms.uSunColor.value.copy(state.sunColor);
 
@@ -437,8 +446,67 @@ function buildMuadDibCreature() {
       hopFwd = Math.sin(u * Math.PI * 2.0) * 0.12;
     }
 
-    const px = homeX + Math.sin(root.rotation.y) * hopFwd;
-    const pz = homeZ + Math.cos(root.rotation.y) * hopFwd;
+    let lookAtYawOffset = 0;
+    let lookAtPitchOffset = 0;
+
+    if (state.player && state.player.active) {
+      const mx = homeX + curOffsetX;
+      const mz = homeZ + curOffsetZ;
+      const dxP = state.player.feetPosition.x - mx;
+      const dzP = state.player.feetPosition.z - mz;
+      const distP = Math.hypot(dxP, dzP);
+
+      if (state.player.muadDibFed && !wasFed) {
+        wasFed = true;
+        happyHopTimer = 1.6;
+        targetOffsetX = 0;
+        targetOffsetZ = 0;
+      }
+
+      // If player sprints loudly right on top of Muad'Dib, it bounds shyly aside
+      if (distP < 1.85 && state.player.sprinting && startleHopTimer <= 0) {
+        const fleeAng = Math.atan2(-dxP, -dzP);
+        targetOffsetX = clamp(curOffsetX + Math.sin(fleeAng) * 1.15, -1.35, 1.35);
+        targetOffsetZ = clamp(curOffsetZ + Math.cos(fleeAng) * 1.15, -1.15, 1.15);
+        startleHopTimer = 0.72;
+      } else if (distP > 4.2 && step > 0) {
+        targetOffsetX *= Math.exp(-step * 0.35);
+        targetOffsetZ *= Math.exp(-step * 0.35);
+      }
+
+      if (startleHopTimer > 0) {
+        startleHopTimer = Math.max(0, startleHopTimer - step);
+        const u = 1.0 - startleHopTimer / 0.72;
+        hopLift = Math.max(hopLift, Math.sin(u * Math.PI) * 0.32);
+      }
+      if (happyHopTimer > 0) {
+        happyHopTimer = Math.max(0, happyHopTimer - step);
+        hopLift = Math.max(hopLift, Math.abs(Math.sin(happyHopTimer * Math.PI * 3.0)) * 0.18);
+      }
+
+      const moveAlpha = Math.min(1, step * 4.5);
+      curOffsetX = mix(curOffsetX, targetOffsetX, moveAlpha);
+      curOffsetZ = mix(curOffsetZ, targetOffsetZ, moveAlpha);
+
+      // Curious head tracking toward player when gently approached!
+      if (distP < 5.2) {
+        const desiredYaw = Math.atan2(dxP, dzP);
+        let dYaw = desiredYaw - root.rotation.y;
+        while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+        while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+        const curiosity = 1.0 - smoothstep(1.2, 5.2, distP);
+        lookAtYawOffset = clamp(dYaw, -0.78, 0.78) * curiosity;
+        lookAtPitchOffset = -0.22 * curiosity;
+      }
+    } else {
+      curOffsetX = 0;
+      curOffsetZ = 0;
+      targetOffsetX = 0;
+      targetOffsetZ = 0;
+    }
+
+    const px = homeX + curOffsetX + Math.sin(root.rotation.y) * hopFwd;
+    const pz = homeZ + curOffsetZ + Math.cos(root.rotation.y) * hopFwd;
     const gy = getGroundHeight(px, pz);
     root.position.set(px, gy + hopLift, pz);
     aoMesh.position.set(px, gy + 0.004, pz);
@@ -448,8 +516,8 @@ function buildMuadDibCreature() {
     bodyPivot.rotation.x = hopLift > 0.01 ? -0.24 : Math.sin(t * 2.4) * 0.03;
 
     const nibble = Math.sin(t * 14.0) * 0.022;
-    headGroup.rotation.x = 0.06 + nibble + Math.sin(t * 1.9) * 0.05;
-    headGroup.rotation.y = -0.18 + Math.sin(t * 1.35 + 0.4) * 0.14;
+    headGroup.rotation.x = 0.06 + nibble + Math.sin(t * 1.9) * 0.05 + lookAtPitchOffset;
+    headGroup.rotation.y = -0.18 + Math.sin(t * 1.35 + 0.4) * 0.14 + lookAtYawOffset;
     pawsGroup.rotation.x = -nibble * 1.1;
 
     const flickL = Math.pow(Math.max(0, Math.sin(t * 3.1 + 0.7)), 12.0) * 0.22;
@@ -684,6 +752,49 @@ function buildShaiHuludSystem() {
   teethIM.instanceMatrix.needsUpdate = true;
   mawGroup.add(teethIM);
 
+  // Lore-authentic "Maker Furnace" recessed volumetric molten spice-heat glow deep within Shai-Hulud's throat!
+  const furnaceUniforms = {
+    uTime: { value: 0 }
+  };
+  const furnaceMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: furnaceUniforms,
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      ${NOISE_GLSL}
+      uniform float uTime;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = (vUv - 0.5) * 2.0;
+        float r = length(p);
+        if (r > 1.0) discard;
+        float turb = fbm2(p * 3.4 + vec2(0.0, -uTime * 1.8)) * 0.65 + vnoise2(p * 7.5 + uTime * 2.4) * 0.35;
+        float core = exp(-r * r * 3.6) * (0.65 + 0.55 * turb);
+        float rimFade = pow(clamp(1.0 - r, 0.0, 1.0), 2.2);
+        float intensity = core * rimFade;
+        vec3 deepEmber = vec3(0.95, 0.22, 0.03);
+        vec3 moltenGold = vec3(1.45, 0.68, 0.16);
+        vec3 col = mix(deepEmber, moltenGold, smoothstep(0.18, 0.85, core));
+        gl_FragColor = vec4(col * intensity * 1.65, clamp(intensity * 1.1, 0.0, 0.92));
+      }
+    `
+  });
+  const furnaceCore = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 6.8), furnaceMat);
+  furnaceCore.position.set(0, 0, -3.45);
+  mawGroup.add(furnaceCore);
+
+  const furnaceLight = new THREE.PointLight(0xff5b16, 22.0, 26.0, 1.6);
+  furnaceLight.position.set(0, 0, -0.8);
+  mawGroup.add(furnaceLight);
+
   // Craggy Vertex-Displaced & Terrain-Feathered Breach Plume (ZERO smooth soap bubbles & ZERO hard Z-buffer terrain cut!)
   const PUFF_COUNT = 88;
   const puffGeo = new THREE.IcosahedronGeometry(1.0, 3);
@@ -914,6 +1025,10 @@ function buildShaiHuludSystem() {
         mawGroup.position.copy(_pt);
         mawGroup.lookAt(_ptAhead);
         mawGroup.rotateZ(0.25 + t * 0.35);
+        w.headPos.copy(_pt);
+        furnaceUniforms.uTime.value = t;
+        const furnacePulse = 0.85 + 0.15 * Math.sin(t * 9.0);
+        furnaceLight.intensity = 24.0 * furnacePulse;
       } else {
         mawGroup.visible = false;
       }
@@ -990,7 +1105,8 @@ function buildShaiHuludSystem() {
       mawGroup.visible = false;
       curtainIM.visible = false;
       segIM.visible = false;
-      puffIM.visible = Boolean(worldState.thumper && worldState.thumper.active);
+      const isHunting = w.phase === 'hunting';
+      puffIM.visible = isHunting || Boolean(worldState.thumper && worldState.thumper.active);
       if (!puffIM.visible) return;
 
       const px = w.position.x;
@@ -998,18 +1114,22 @@ function buildShaiHuludSystem() {
       const ch = Math.cos(w.heading);
       const sh = Math.sin(w.heading);
       const groundAttr = puffGeo.attributes.aGroundY;
+      const wakeCount = isHunting ? 52 : 28;
+      const wakeLen = isHunting ? 52.0 : 34.0;
+      const scaleMult = isHunting ? 1.48 : 1.0;
 
       for (let p = 0; p < PUFF_COUNT; p++) {
-        if (p < 28) {
-          const u = p / 28;
-          const back = u * 34.0;
-          const sx = px - sh * back + Math.sin(p * 2.1 + t) * 2.8;
-          const sz = pz - ch * back + Math.cos(p * 1.7 + t) * 2.8;
+        if (p < wakeCount) {
+          const u = p / wakeCount;
+          const back = u * wakeLen;
+          const spread = (isHunting ? 3.8 : 2.8) * (0.45 + u * 0.85);
+          const sx = px - sh * back + Math.sin(p * 2.1 + t * (isHunting ? 3.4 : 1.0)) * spread;
+          const sz = pz - ch * back + Math.cos(p * 1.7 + t * (isHunting ? 3.4 : 1.0)) * spread;
           const gy = getGroundHeight(sx, sz);
           groundAttr.array[p] = gy;
-          const puffR = (1.8 + u * 2.8) * (1.0 - u * 0.45);
-          _dummy.position.set(sx, gy + 1.2 + puffR * 0.35, sz);
-          _dummy.scale.set(puffR * 1.3, puffR * 0.75, puffR * 1.3);
+          const puffR = (2.1 + u * 3.4) * (1.0 - u * 0.42) * scaleMult;
+          _dummy.position.set(sx, gy + 1.1 + puffR * 0.42, sz);
+          _dummy.scale.set(puffR * 1.32, puffR * (isHunting ? 0.96 : 0.75), puffR * 1.32);
         } else {
           _dummy.scale.setScalar(0.001);
         }

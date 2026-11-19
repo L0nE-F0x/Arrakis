@@ -3,7 +3,7 @@ import { Reflector } from 'three/addons/objects/Reflector.js';
 import { NOISE_GLSL } from '../shaders/noise.glsl.js';
 import { CISTERN_CENTER, WATER_LEVEL, getTerrainInfo, smoothstep } from './terrainMath.js';
 
-const TERRAIN_SEGS = 480;
+const TERRAIN_SEGS = 540;
 const TERRAIN_RADIUS = 480.0;
 const TERRAIN_CENTER_X = 0.0;
 const TERRAIN_CENTER_Z = -6.0;
@@ -175,7 +175,7 @@ function createTerrainMaterial(sharedUniforms) {
     envMapIntensity: 0.25
   });
 
-  material.customProgramCacheKey = () => 'arrakis-terrain-pbr-v14';
+  material.customProgramCacheKey = () => 'arrakis-terrain-pbr-v15-trails-caustics';
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, sharedUniforms);
@@ -195,6 +195,10 @@ attribute float aSlip;
 uniform float uTime;
 uniform vec3 uWormPos;
 uniform float uWormTremor;
+uniform sampler2D uTrailMap;
+uniform vec2 uTrailOrigin;
+uniform float uTrailSize;
+uniform float uTrailEnabled;
 
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
@@ -213,9 +217,16 @@ varying float vSlip;
 vec4 arrakisPreWorld = modelMatrix * vec4( transformed, 1.0 );
 vec2 wormDeltaV = arrakisPreWorld.xz - uWormPos.xz;
 float wormDistV = length( wormDeltaV );
-if ( arrakisPreWorld.z < -70.0 && wormDistV < 24.0 && uWormTremor > 0.01 ) {
-  float wFalloff = exp( -wormDistV * 0.14 ) * smoothstep( 24.0, 4.0, wormDistV );
-  transformed.y += sin( wormDistV * 0.9 - uTime * 7.0 ) * wFalloff * uWormTremor * 0.42;
+if ( arrakisPreWorld.z < -26.0 && wormDistV < 26.0 && uWormTremor > 0.01 ) {
+  float wFalloff = exp( -wormDistV * 0.13 ) * smoothstep( 26.0, 4.0, wormDistV );
+  transformed.y += sin( wormDistV * 0.85 - uTime * 7.2 ) * wFalloff * uWormTremor * 0.56;
+}
+if ( uTrailEnabled > 0.5 && aRock < 0.75 ) {
+  vec2 tvUv = ( arrakisPreWorld.xz - uTrailOrigin ) / uTrailSize + 0.5;
+  if ( tvUv.x > 0.03 && tvUv.x < 0.97 && tvUv.y > 0.03 && tvUv.y < 0.97 ) {
+    float tDisp = ( texture2D( uTrailMap, tvUv ).r - 0.5 ) * 2.0;
+    transformed.y += tDisp * 0.048 * ( 1.0 - aRock );
+  }
 }
 `
       )
@@ -261,6 +272,10 @@ uniform float uThumperPulse;
 uniform float uThumperTrail;
 uniform vec3 uWormPos;
 uniform float uWormTremor;
+uniform sampler2D uTrailMap;
+uniform vec2 uTrailOrigin;
+uniform float uTrailSize;
+uniform float uTrailEnabled;
 
 varying vec3 vWorldPos;
 varying vec3 vWorldNormal;
@@ -670,19 +685,68 @@ if ( uWormTremor > 0.01 ) {
   }
 }
 
+// 4b. Real-Time Dynamic Sand Footprints, Dune-Slide Chutes & Thumper Impact Craters
+if ( uTrailEnabled > 0.5 && rockFactor < 0.85 && viewDist < 42.0 ) {
+  vec2 tUv = ( vWorldPos.xz - uTrailOrigin ) / uTrailSize + 0.5;
+  if ( tUv.x > 0.02 && tUv.x < 0.98 && tUv.y > 0.02 && tUv.y < 0.98 ) {
+    float trailEdge = smoothstep( 0.02, 0.09, tUv.x ) * smoothstep( 0.98, 0.91, tUv.x )
+                    * smoothstep( 0.02, 0.09, tUv.y ) * smoothstep( 0.98, 0.91, tUv.y );
+    float trailDistFade = 1.0 - smoothstep( 26.0, 42.0, viewDist );
+    float tWeight = trailEdge * trailDistFade * ( 1.0 - rockFactor * 0.85 );
+
+    vec2 tSample = texture2D( uTrailMap, tUv ).rg;
+    float tHeight = ( tSample.r - 0.5 ) * 2.0; // -1 recessed pit .. +1 raised rim
+    float tComp = tSample.g;                   // 0 untouched .. 1 compacted
+
+    if ( abs( tHeight ) > 0.008 || tComp > 0.012 ) {
+      float texStep = 1.65 / 512.0;
+      float hL = ( texture2D( uTrailMap, tUv - vec2( texStep, 0.0 ) ).r - 0.5 ) * 2.0;
+      float hR = ( texture2D( uTrailMap, tUv + vec2( texStep, 0.0 ) ).r - 0.5 ) * 2.0;
+      float hD = ( texture2D( uTrailMap, tUv - vec2( 0.0, texStep ) ).r - 0.5 ) * 2.0;
+      float hU = ( texture2D( uTrailMap, tUv + vec2( 0.0, texStep ) ).r - 0.5 ) * 2.0;
+      float worldSpan = 2.0 * texStep * uTrailSize;
+      vec2 tGrad = vec2( ( hR - hL ) / worldSpan, ( hU - hD ) / worldSpan );
+
+      // Damp wind ripples cleanly inside fresh boot sole & carve crisp rim normal shading
+      float rippleSuppress = clamp( tComp * 0.84 * tWeight, 0.0, 0.90 );
+      totalGrad.xz *= ( 1.0 - rippleSuppress );
+      totalGrad.xz += tGrad * ( 0.36 * tWeight );
+
+      // Darken compacted interior pit slightly & brighten sunlit raised sand rim lip
+      float pitShadow = clamp( -tHeight, 0.0, 1.0 ) * tWeight;
+      float rimCatch = clamp( tHeight, 0.0, 1.0 ) * tWeight;
+      baseAlbedo *= ( 1.0 - pitShadow * 0.25 + rimCatch * 0.12 );
+      terrainRoughness = mix( terrainRoughness, 0.96, tComp * 0.5 * tWeight );
+    }
+  }
+}
+
 // Compute perturbed world normal via tangent-plane projected gradient
 vec3 surfGrad = totalGrad - n0 * dot( totalGrad, n0 );
 vec3 arrakisWorldNormal = normalize( n0 - surfGrad );
 
-// 5. Physically Saturated Pore-Water Wet Sand & Sunlit Shallow Submerged Bed (rich dark moisture collar grounding shore)
+// 5. Physically Saturated Pore-Water Wet Sand, Shallow Bed & Animated Solar Caustics
 if ( wetFactor > 0.005 ) {
   vec3 wetSand = pow( max( baseAlbedo, vec3( 0.001 ) ), vec3( 1.28 ) ) * vec3( 0.60, 0.53, 0.44 );
   float subDepthTerrain = max( 0.0, ${WATER_LEVEL.toFixed(2)} - vWorldPos.y );
   vec3 bedTint = wetSand * exp( -subDepthTerrain * vec3( 0.34, 0.24, 0.26 ) );
+
+  // Dual-layer refracted animated solar caustics dancing on submerged sandy cistern floor!
+  if ( subDepthTerrain > 0.015 ) {
+    vec2 cUv1 = vWorldPos.xz * 2.35 + wDir * ( uTime * 0.26 );
+    vec2 cUv2 = vWorldPos.xz * 3.15 - wPerp * ( uTime * 0.21 ) + vec2( 4.3, -2.9 );
+    float nA = abs( vnoise2( cUv1 + vec2( sin( cUv1.y * 1.4 + uTime * 0.9 ) * 0.35, cos( cUv1.x * 1.3 - uTime * 0.8 ) * 0.35 ) ) - 0.5 ) * 2.0;
+    float nB = abs( vnoise2( cUv2 + vec2( cos( cUv2.y * 1.6 - uTime * 1.1 ) * 0.30, sin( cUv2.x * 1.5 + uTime * 0.95 ) * 0.30 ) ) - 0.5 ) * 2.0;
+    float causticNet = pow( clamp( 1.0 - min( nA, nB ), 0.0, 1.0 ), 4.2 );
+    float causticDepthMask = smoothstep( 0.015, 0.14, subDepthTerrain ) * exp( -subDepthTerrain * 1.4 );
+    float causticSun = smoothstep( 0.02, 0.24, normalize( uSunDir ).y ) * ( 1.0 - darkGateM ) * clamp( uSunIntensity / 2.6, 0.0, 1.2 );
+    bedTint += uSunColor * vec3( 1.05, 0.94, 0.72 ) * causticNet * causticDepthMask * causticSun * 0.48;
+  }
+
   vec3 wetAlbedo = mix( wetSand, bedTint, smoothstep( 0.0, 0.05, subDepthTerrain ) );
   baseAlbedo = mix( baseAlbedo, wetAlbedo, wetFactor * 0.92 );
 
-  float wetRough = mix( 0.36, 0.72, smoothstep( 0.0, 0.08, subDepthTerrain ) );
+  float wetRough = mix( 0.34, 0.70, smoothstep( 0.0, 0.08, subDepthTerrain ) );
   terrainRoughness = mix( terrainRoughness, wetRough, wetFactor * ( 1.0 - rockFactor * 0.4 ) );
 }
 
@@ -771,7 +835,17 @@ float saltationGlow = ( rimGrazing * 0.68 + 0.32 ) * ( 0.25 + 0.75 * forwardScat
 vec3 saltMistCol = mix( uSunColor, vec3( 1.0, 0.74, 0.40 ), 0.42 );
 baseAlbedo = mix( baseAlbedo, saltMistCol * 0.92, clamp( saltationGlow * 0.18, 0.0, 0.22 ) );
 arrakisEmissive += saltMistCol * saltationGlow * 0.16;
-arrakisEmissive += uSunColor * ( quartzSparkle * 0.042 * sunUp * sunDayGate * sunStrength );
+
+// Subsurface warm fiery translucency along backlit razor barchan dune crests!
+float crestBacklit = pow( max( dot( V, -sunDirW ), 0.0 ), 3.4 ) * pow( 1.0 - ndotv, 2.2 )
+                   * smoothstep( 0.56, 0.95, vCrest ) * sandMask * dryMargin * sunUp * ( 1.0 - darkGateM ) * sunStrength;
+arrakisEmissive += mix( uSunColor, vec3( 1.0, 0.58, 0.20 ), 0.48 ) * crestBacklit * 0.26;
+
+// View-dependent stochastic warm golden quartz micro-facet glints dancing on sunlit foreground sand!
+float viewSparkle = pow( max( dot( arrakisWorldNormal, halfVec ), 0.0 ), 5.0 )
+                  * pow( clamp( vnoise2( gmUv * 96.0 + V.xz * 2.8 ) * vnoise2( gmUv.yx * 134.0 - V.xz * 2.1 ) * 1.48, 0.0, 1.0 ), 13.5 )
+                  * sparkFade * sunUp * sunDayGate * ( 1.0 - darkGateM ) * sandMask * dryMargin;
+arrakisEmissive += mix( uSunColor, vec3( 1.0, 0.78, 0.44 ), 0.45 ) * ( ( quartzSparkle * 0.038 + viewSparkle * 0.34 ) * sunUp * sunDayGate * sunStrength );
 
 // Strictly clamp all emissive/glint terms to 0 on capillary wet margins
 arrakisEmissive *= dryMargin;
@@ -969,7 +1043,10 @@ function createDewCisternReflector(worldState, terrainGeo) {
         uSkyColor: { value: new THREE.Color(0xe6ab7a) },
         uZenithColor: { value: new THREE.Color(0x4b6088) },
         uThumperPos: { value: new THREE.Vector3(8.5, 0, -14.5) },
-        uThumperPulse: { value: 0 }
+        uThumperPulse: { value: 0 },
+        uRipples: {
+          value: Array.from({ length: 16 }, () => new THREE.Vector4(0, 0, -999, 0))
+        }
       }
     ]),
     vertexShader: /* glsl */ `
@@ -1011,6 +1088,7 @@ uniform vec3 uSkyColor;
 uniform vec3 uZenithColor;
 uniform vec3 uThumperPos;
 uniform float uThumperPulse;
+uniform vec4 uRipples[16];
 
 varying vec4 vUv;
 varying vec3 vWorldPos;
@@ -1110,6 +1188,26 @@ void main() {
     rippleXZ += tDir * tRing;
   }
 
+  // Interactive 16-slot expanding circular water wake ripples (wading footsteps, drinking & tamarisk dew drips!)
+  float interactiveFoam = 0.0;
+  for ( int ri = 0; ri < 16; ri++ ) {
+    vec4 rp = uRipples[ri];
+    float age = uTime - rp.z;
+    if ( age > 0.0 && age < 4.2 && rp.w > 0.005 ) {
+      vec2 rDelta = p - rp.xy;
+      float rDist = length( rDelta );
+      float frontR = age * 1.65;
+      float ringDelta = rDist - frontR;
+      float env = exp( -ringDelta * ringDelta * 5.2 ) * exp( -age * 0.85 ) * smoothstep( 0.0, 0.08, rDist );
+      if ( env > 0.001 ) {
+        vec2 rDir = rDelta / max( rDist, 0.001 );
+        float waveSlope = cos( ringDelta * 14.5 ) * env * rp.w * 0.092 * shoreCalm * aa1;
+        rippleXZ += rDir * waveSlope;
+        interactiveFoam += max( sin( ringDelta * 14.5 ), 0.0 ) * env * rp.w * 0.14;
+      }
+    }
+  }
+
   vec3 N = normalize( vec3( -rippleXZ.x * 1.35, 1.0, -rippleXZ.y * 1.35 ) );
   float NdotV = clamp( dot( N, V ), 0.05, 1.0 );
 
@@ -1185,7 +1283,7 @@ void main() {
   float RdotM = max( dot( Rglint, moonRefDir ), 0.0 );
   vec3 moonShimmer = vec3( 0.62, 0.80, 1.0 ) * ( pow( RdotM, 96.0 ) * 0.22 ) * nightMirror * glintMask;
 
-  waterContrib += glintContrib + moonShimmer;
+  waterContrib += glintContrib + moonShimmer + mix( uSunColor, vec3( 0.85, 0.94, 1.0 ), 0.45 ) * interactiveFoam * shoreCalm;
 
   float alpha = clamp( shoreFade * alphaPhys + shoreFade * glintSharp * glintMask * 0.025, 0.0, 0.95 );
   vec3 finalWater = min( ( shoreFade * waterContrib ) / max( alpha, 0.0005 ), vec3( 4.2 ) );
@@ -1197,10 +1295,11 @@ void main() {
 `
   };
 
+  const initRes = worldState?.getQualityConfig?.().waterRes || 1024;
   const reflector = new Reflector(waterGeo, {
     clipBias: 0.0035,
-    textureWidth: 768,
-    textureHeight: 768,
+    textureWidth: initRes,
+    textureHeight: initRes,
     color: 0x6ba6a2,
     shader: customWaterShader
   });
@@ -1237,9 +1336,12 @@ void main() {
  * @param {import('../state/worldState.js').WorldState} worldState
  * @returns {{ group: THREE.Group, update: (dt: number) => void }}
  */
-export function createTerrainSystem(scene, worldState) {
+export function createTerrainSystem(scene, worldState, sandTrails = null) {
   const group = new THREE.Group();
   group.name = 'ArrakisTerrainSystem';
+
+  const fallbackTrailTex = new THREE.DataTexture(new Uint8Array([128, 0, 128, 255]), 1, 1);
+  fallbackTrailTex.needsUpdate = true;
 
   const terrainUniforms = {
     uTime: { value: worldState ? worldState.elapsed : 0 },
@@ -1260,7 +1362,11 @@ export function createTerrainSystem(scene, worldState) {
     uThumperPulse: { value: worldState ? worldState.thumper.pulseStrength : 0 },
     uThumperTrail: { value: worldState ? worldState.thumper.pulseStrength : 0 },
     uWormPos: { value: new THREE.Vector3(-25, 0, -125).copy(worldState?.worm.position ?? { x: -25, y: 0, z: -125 }) },
-    uWormTremor: { value: worldState ? worldState.worm.tremor : 0 }
+    uWormTremor: { value: worldState ? worldState.worm.tremor : 0 },
+    uTrailMap: { value: sandTrails ? sandTrails.texture : fallbackTrailTex },
+    uTrailOrigin: { value: sandTrails ? sandTrails.origin.clone() : new THREE.Vector2(0, 8) },
+    uTrailSize: { value: sandTrails ? sandTrails.worldSize : 52.0 },
+    uTrailEnabled: { value: sandTrails ? 1.0 : 0.0 }
   };
 
   // 1. Single seamless radially-warped continuous terrain mesh (0.28m oasis detail -> 480m horizon)
@@ -1311,6 +1417,10 @@ export function createTerrainSystem(scene, worldState) {
     terrainUniforms.uThumperTrail.value = thumperTrail;
     terrainUniforms.uWormPos.value.copy(worldState.worm.position);
     terrainUniforms.uWormTremor.value = worldState.worm.tremor;
+    if (sandTrails) {
+      terrainUniforms.uTrailOrigin.value.copy(sandTrails.origin);
+      terrainUniforms.uTrailEnabled.value = 1.0;
+    }
 
     const wu = waterReflector.material.uniforms;
     wu.uTime.value = worldState.elapsed;
@@ -1323,7 +1433,21 @@ export function createTerrainSystem(scene, worldState) {
     wu.uZenithColor.value.copy(worldState.skyZenithColor);
     wu.uThumperPos.value.copy(worldState.thumper.position);
     wu.uThumperPulse.value = thumperTrail;
+    if (sandTrails && wu.uRipples) {
+      const dst = wu.uRipples.value;
+      const src = sandTrails.waterRipples;
+      for (let i = 0; i < 16 && i < src.length; i++) {
+        dst[i].copy(src[i]);
+      }
+    }
   }
 
-  return { group, update };
+  function setWaterResolution(res) {
+    const rt = waterReflector.getRenderTarget?.();
+    if (rt && (rt.width !== res || rt.height !== res)) {
+      rt.setSize(res, res);
+    }
+  }
+
+  return { group, update, setWaterResolution };
 }

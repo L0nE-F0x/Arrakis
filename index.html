@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ARRAKIS — Procedural World &amp; Atmospheric Simulation</title>
+    <title>ARRAKIS — Interactive Desert Simulation &amp; World Benchmark</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23160f0a' stroke='%23e6a85c' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23ffd089'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
@@ -17,7 +17,7 @@
         <div class="veil-moon-b"></div>
       </div>
       <p class="veil-title">ARRAKIS</p>
-      <p class="veil-sub" id="loading-status">Synthesizing Erg Geometry &amp; Shaders…</p>
+      <p class="veil-sub" id="loading-status">Synthesizing Erg Geometry, IBL &amp; Shaders…</p>
     </div>
 
     <div id="hud-root" class="hud-root">
@@ -31,22 +31,35 @@
         </div>
 
         <div class="top-actions">
-          <button id="btn-director" class="pill-btn active" title="Toggle Choreographed Director Shot">
-            <span class="dot"></span> Director Cut
-          </button>
+          <div class="mode-switch" role="group" aria-label="Camera Mode">
+            <button id="btn-walk" class="pill-btn mode-walk" title="Step onto the desert in First-Person [1]">
+              <span class="dot"></span> Walk Desert
+            </button>
+            <button id="btn-free" class="pill-btn" title="Free Orbit &amp; Aerial Flight [2]">
+              Free Fly
+            </button>
+            <button id="btn-director" class="pill-btn active" title="Choreographed Director Shot [3]">
+              Director Cut
+            </button>
+          </div>
+
           <button id="btn-audio" class="pill-btn" title="Toggle Procedural Desert Soundscape">
             Soundscape
           </button>
-          <button id="btn-thumper" class="pill-btn accent" title="Plant & Activate Fremen Thumper">
-            Strike Thumper
+          <button id="btn-thumper" class="pill-btn accent" title="Plant or Trigger Fremen Thumper [T]">
+            Thumper
+          </button>
+          <button id="btn-deck-toggle" class="pill-btn" title="Toggle World &amp; Graphics Controls [Tab]">
+            Controls
           </button>
           <a href="/gauntlet.html" target="_blank" class="pill-btn subtle" title="Open Gauntlet Loop Progress Log">
-            Gauntlet Log
+            Log
           </a>
           <button id="btn-hide-hud" class="pill-btn icon" title="Hide UI [H]">H</button>
         </div>
       </header>
 
+      <!-- Collapsible World, Weather, Graphics & Lens Deck -->
       <aside class="hud-deck" id="hud-deck">
         <section class="deck-section">
           <div class="section-head">
@@ -82,31 +95,125 @@
             <button data-weather="coriolisStorm">Coriolis Storm</button>
           </div>
           <div class="slider-pair">
-            <label>Wind <span id="readout-wind" class="mono-val">0.45</span></label>
+            <label>Wind <span id="readout-wind" class="mono-val">4.5 m/s</span></label>
             <input id="slider-wind" type="range" min="0" max="1.6" step="0.02" value="0.45" />
           </div>
         </section>
 
         <section class="deck-section">
           <div class="section-head">
-            <span>CAMERA LENS</span>
+            <span>GRAPHICS FIDELITY</span>
+            <span id="readout-quality" class="mono-val">Ultra</span>
+          </div>
+          <div class="chip-grid tri" id="preset-quality">
+            <button data-quality="balanced">Balanced</button>
+            <button data-quality="ultra" class="active">Ultra</button>
+            <button data-quality="overdrive">Overdrive</button>
+          </div>
+          <p class="hint-line" id="readout-gpu-stats">IBL · God Rays · 3072 Shadows · Live Sand Trails</p>
+        </section>
+
+        <section class="deck-section">
+          <div class="section-head">
+            <span>CAMERA &amp; LANDMARKS</span>
             <span id="readout-cam" class="mono-val">Director</span>
           </div>
           <div class="chip-grid" id="preset-camera">
+            <button data-cam="walk">Walk Desert</button>
+            <button data-cam="free">Free Fly</button>
             <button data-cam="director" class="active">Director Cut</button>
-            <button data-cam="free">Free Orbit</button>
             <button data-cam="cistern">Dew Cistern</button>
+            <button data-cam="camp">Yardang Camp</button>
             <button data-cam="flora">Macro Flora</button>
             <button data-cam="canopy">Canopy Sky</button>
             <button data-cam="muaddib">Muad'Dib</button>
             <button data-cam="yardang">Yardangs</button>
             <button data-cam="ridge">Great Erg</button>
+            <button data-cam="ornithopter">Ornithopter</button>
             <button data-cam="worm">Shai-Hulud</button>
             <button data-cam="spice">Spice Blow</button>
           </div>
-          <p class="hint-line">Drag to orbit · Scroll to zoom · WASD glide · [H] clean view</p>
+          <p class="hint-line">1 Walk · 2 Fly · 3 Cut · Tab Controls · H Clean</p>
         </section>
       </aside>
+
+      <!-- First-Person Fremen Explorer Diegetic HUD (visible only in Walk mode) -->
+      <div id="fremen-hud" class="fremen-hud hidden">
+        <!-- Top-Center Compass Ribbon -->
+        <div class="compass-shell">
+          <canvas id="compass-canvas" width="380" height="32"></canvas>
+          <div class="compass-caret"></div>
+        </div>
+
+        <!-- Subtle Click-to-Lock Hint -->
+        <div id="walk-lock-hint" class="walk-lock-hint">
+          Click desert for mouse look · <strong>WASD</strong> walk · <strong>Shift</strong> sprint/slide · <strong>C</strong> Sandwalk · <strong>T</strong> Thumper · <strong>L</strong> Glowglobe · <strong>RMB</strong> Optics
+        </div>
+
+        <!-- Center Crosshair & Contextual Interaction Prompt -->
+        <div id="walk-reticle" class="walk-reticle"></div>
+        <div id="interact-prompt" class="interact-prompt hidden"></div>
+
+        <!-- Electro-Optics Binocular Rangefinder Overlay -->
+        <div id="optics-overlay" class="optics-overlay hidden">
+          <div class="optics-ring"></div>
+          <div class="optics-crosshair-h"></div>
+          <div class="optics-crosshair-v"></div>
+          <div class="optics-meta-left">
+            <span class="optics-label">FREMEN ELECTRO-OPTICS</span>
+            <span id="optics-zoom" class="optics-val">2.6x · SCROLL ZOOM</span>
+          </div>
+          <div class="optics-meta-right">
+            <span class="optics-label">BEARING / ELEV</span>
+            <span id="optics-bearing" class="optics-val">N 000° · +00°</span>
+          </div>
+          <div id="optics-target" class="optics-target hidden">
+            <span id="optics-target-name" class="optics-t-name">SHAI-HULUD</span>
+            <span id="optics-target-sub" class="optics-t-sub">BREACHING · 108m</span>
+          </div>
+        </div>
+
+        <!-- Bottom-Left Stillsuit Vitals & Quick Gear Belt -->
+        <div class="fremen-gear">
+          <div class="gear-row">
+            <button id="gear-sandwalk" class="gear-chip" title="Toggle Sandwalk [C]">
+              <kbd>C</kbd> Sandwalk
+            </button>
+            <button id="gear-thumper" class="gear-chip" title="Aim &amp; Plant Thumper [T]">
+              <kbd>T</kbd> Thumper
+            </button>
+            <button id="gear-glowglobe" class="gear-chip" title="Toggle Suspensor Glowglobe [L]">
+              <kbd>L</kbd> Glowglobe
+            </button>
+            <button id="gear-optics" class="gear-chip" title="Toggle Electro-Optics [V / RMB]">
+              <kbd>V</kbd> Optics
+            </button>
+          </div>
+          <div class="vitals-row">
+            <span>Water <strong id="vital-water">100%</strong></span>
+            <span>·</span>
+            <span>Mélange <strong id="vital-spice">0</strong></span>
+            <span>·</span>
+            <span>Discoveries <strong id="vital-disc">1/7</strong></span>
+          </div>
+        </div>
+
+        <!-- Bottom-Center Live Seismic Wormsign Oscilloscope -->
+        <div class="seismo-panel" id="seismo-panel">
+          <div class="seismo-head">
+            <span id="seismo-status">SAFE BASIN ROCK</span>
+            <span id="seismo-threat" class="mono-val">0%</span>
+          </div>
+          <canvas id="seismo-canvas" width="240" height="34"></canvas>
+        </div>
+      </div>
+
+      <!-- Poetic Discovery / Event Whisper Toast -->
+      <div id="toast-banner" class="toast-banner hidden">
+        <span class="toast-kicker" id="toast-kicker">DISCOVERY</span>
+        <span class="toast-title" id="toast-title">Downed Ornithopter</span>
+        <span class="toast-detail" id="toast-detail">Half-swallowed by the Erg.</span>
+      </div>
 
       <div id="caption-banner" class="caption-banner">
         <span class="cap-kicker" id="cap-kicker">SIETCH DEW BASIN</span>

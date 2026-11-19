@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 import { WorldState } from './state/worldState.js';
+import { createEnvironmentIBL } from './world/envLighting.js';
+import { createSandTrailsSystem } from './world/sandTrails.js';
 import { createSkySystem } from './world/sky.js';
 import { createTerrainSystem } from './world/terrain.js';
 import { createGeologyAndProps } from './world/geology.js';
+import { createLandmarksSystem } from './world/landmarks.js';
 import { createFloraSystem } from './world/flora.js';
 import { createFaunaSystem } from './world/fauna.js';
 import { createAtmosphereFXSystem } from './world/atmosphereFX.js';
+import { createPlayerController } from './world/player.js';
 import { createCameraController } from './world/camera.js';
 import { createPostProcess } from './world/postprocess.js';
 import { createSoundscape } from './audio/soundscape.js';
@@ -20,12 +24,17 @@ function boot() {
   const container = document.getElementById('canvas-root');
   const loadingVeil = document.getElementById('loading-veil');
   const loadingStatus = document.getElementById('loading-status');
+  const urlParams = new URLSearchParams(window.location.search);
+  const isCleanCapture = urlParams.get('clean') === '1';
+
+  const worldState = new WorldState();
+  const initQ = worldState.getQualityConfig();
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
     powerPreference: 'high-performance'
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, initQ.pixelRatioCap));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -42,23 +51,22 @@ function boot() {
     1200
   );
 
-  const worldState = new WorldState();
   scene.fog = new THREE.FogExp2(worldState.fogColor.getHex(), worldState.fogDensity);
 
-  // Canopus Sun key directional light (2048x2048 shadow frustum over entire focal basin, xerophytes & western Yardangs)
+  // Canopus Sun key directional light (dynamically follows player across the Erg with texel snapping!)
   const sunLight = new THREE.DirectionalLight(0xffcfa0, worldState.sunIntensity);
   sunLight.castShadow = true;
-  sunLight.shadow.mapSize.set(2048, 2048);
-  sunLight.shadow.radius = 1.7;
+  sunLight.shadow.mapSize.set(initQ.shadowMapSize, initQ.shadowMapSize);
+  sunLight.shadow.radius = initQ.shadowRadius;
   sunLight.shadow.camera.near = 1;
-  sunLight.shadow.camera.far = 220;
-  sunLight.shadow.camera.left = -58;
-  sunLight.shadow.camera.right = 58;
-  sunLight.shadow.camera.top = 58;
-  sunLight.shadow.camera.bottom = -58;
+  sunLight.shadow.camera.far = 240;
+  sunLight.shadow.camera.left = -62;
+  sunLight.shadow.camera.right = 62;
+  sunLight.shadow.camera.top = 62;
+  sunLight.shadow.camera.bottom = -62;
   sunLight.shadow.camera.updateProjectionMatrix();
-  sunLight.shadow.bias = -0.0003;
-  sunLight.shadow.normalBias = 0.010;
+  sunLight.shadow.bias = -0.00028;
+  sunLight.shadow.normalBias = 0.012;
   sunLight.target.position.set(-4, 1, -2);
   scene.add(sunLight);
   scene.add(sunLight.target);
@@ -88,12 +96,28 @@ function boot() {
     sunLight.color.copy(worldState.sunColor);
     sunLight.castShadow = sunLight.intensity > 0.06;
 
+    // Texel-snapped player/camera-following shadow cascade when exploring deep Erg!
+    if (worldState.player.active) {
+      const snap = 2.0;
+      const fx = Math.round(worldState.player.feetPosition.x / snap) * snap;
+      const fz = Math.round(worldState.player.feetPosition.z / snap) * snap;
+      sunLight.target.position.set(fx, worldState.player.feetPosition.y, fz);
+    } else if (worldState.cameraMode === 'free' || worldState.cameraMode === 'ornithopter') {
+      const snap = 4.0;
+      const fx = Math.round(camera.position.x / snap) * snap;
+      const fz = Math.round((camera.position.z - 10) / snap) * snap;
+      sunLight.target.position.set(fx, Math.max(0, camera.position.y - 4), fz);
+    } else {
+      sunLight.target.position.set(-4, 1, -2);
+    }
+    sunLight.target.updateMatrixWorld();
+
     _sunPosDir.set(
       worldState.sunDir.x,
       Math.max(worldState.sunDir.y, 0.08),
       worldState.sunDir.z
     ).normalize();
-    sunLight.position.copy(sunLight.target.position).addScaledVector(_sunPosDir, 95);
+    sunLight.position.copy(sunLight.target.position).addScaledVector(_sunPosDir, 100);
 
     _moonPosDir.set(
       worldState.moonKrellnDir.x,
@@ -120,47 +144,101 @@ function boot() {
     renderer.toneMappingExposure = 1.04 + (worldState.exposure - 1.02);
   }
 
-  if (loadingStatus) loadingStatus.textContent = 'Synthesizing Astral Sky, Oasis Flora & Shai-Hulud…';
+  if (loadingStatus) loadingStatus.textContent = 'Synthesizing Astral IBL, Erg Dunes, Fremen Outpost & Shai-Hulud…';
 
+  const envIBL = createEnvironmentIBL(renderer, scene, worldState);
+  const sandTrails = createSandTrailsSystem(worldState);
   const skySystem = createSkySystem(scene, worldState);
-  const terrainSystem = createTerrainSystem(scene, worldState);
+  const terrainSystem = createTerrainSystem(scene, worldState, sandTrails);
   const geologySystem = createGeologyAndProps(scene, worldState);
+  const landmarksSystem = createLandmarksSystem(scene, worldState);
   const floraSystem = createFloraSystem(scene, worldState);
   const faunaSystem = createFaunaSystem(scene, worldState);
   const atmoFXSystem = createAtmosphereFXSystem(scene, worldState);
-  const cameraController = createCameraController(camera, renderer.domElement, worldState);
-  const postProcess = createPostProcess(renderer, scene, camera, worldState);
   const soundscape = createSoundscape(worldState);
+
+  const allColliders = [
+    ...(geologySystem.colliders || []),
+    ...(landmarksSystem.colliders || [])
+  ];
+
+  const playerController = createPlayerController({
+    camera,
+    domElement: renderer.domElement,
+    scene,
+    worldState,
+    sandTrails,
+    atmosphereFX: atmoFXSystem,
+    soundscape,
+    colliders: allColliders,
+    interactables: landmarksSystem.interactables
+  });
+
+  // Interactive users launch directly onto Arrakis in Walk mode; automated ?clean=1 capture starts in Director
+  worldState.cameraMode = isCleanCapture ? 'director' : 'walk';
+
+  const cameraController = createCameraController(camera, renderer.domElement, worldState, playerController);
+  const postProcess = createPostProcess(renderer, scene, camera, worldState);
+
+  function applyQualityTier(tier) {
+    worldState.setQuality(tier);
+    const q = worldState.getQualityConfig();
+    if (sunLight.shadow.mapSize.width !== q.shadowMapSize) {
+      sunLight.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
+      sunLight.shadow.map?.dispose();
+      sunLight.shadow.map = null;
+    }
+    sunLight.shadow.radius = q.shadowRadius;
+    terrainSystem.setWaterResolution?.(q.waterRes);
+    postProcess.applyQuality?.();
+  }
 
   const hud = initHud(worldState, cameraController, {
     onToggleAudio: () => soundscape.toggle(),
-    onThumper: () => {}
+    isAudioEnabled: () => soundscape.isEnabled(),
+    onThumper: () => {
+      soundscape.playThumperPlant?.();
+    },
+    onToggleGlowglobe: () => {
+      playerController.toggleGlowglobe();
+    },
+    onQualityChange: (tier) => {
+      applyQualityTier(tier);
+    },
+    onEnterWalk: () => {
+      soundscape.ensureStarted?.();
+    }
   });
 
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('clean') === '1') {
+  if (isCleanCapture) {
     hud.setHudVisible(false);
+  } else {
+    // Start with the wide uncluttered cinema viewport while walking (Tab or Controls button opens deck!)
+    hud.setDeckOpen(false);
   }
 
   function stepSimulation(dt) {
     worldState.update(dt);
-    syncLightingAndFog();
     cameraController.update(dt);
+    syncLightingAndFog();
+    envIBL.update(dt);
+    sandTrails.update(dt);
     skySystem?.update?.(dt, camera);
     terrainSystem?.update?.(dt, camera);
     geologySystem?.update?.(dt, camera);
+    landmarksSystem?.update?.(dt, camera);
     floraSystem?.update?.(dt, camera);
     faunaSystem?.update?.(dt, camera);
     atmoFXSystem?.update?.(dt, camera);
-    soundscape?.update?.(dt);
+    soundscape?.update?.(dt, camera);
     hud.update(dt);
   }
 
-  if (loadingStatus) loadingStatus.textContent = 'Compiling WebGL2 Atmospheric Shaders…';
+  if (loadingStatus) loadingStatus.textContent = 'Compiling WebGL2 Atmospheric & Volumetric Shaders…';
   syncLightingAndFog();
   stepSimulation(0.016);
   postProcess.render(0.016);
-  if (urlParams.get('clean') === '1' && loadingVeil) {
+  if (isCleanCapture && loadingVeil) {
     loadingVeil.style.display = 'none';
   }
   loadingVeil?.classList.add('hidden');
@@ -188,10 +266,14 @@ function boot() {
   }
   window.addEventListener('resize', handleResize);
 
-  // Deterministic Gauntlet capture & diagnostic API
+  // Deterministic Gauntlet capture, interactive test & diagnostic API
   window.__ARRAKIS__ = {
     ready: true,
     state: worldState,
+    player: playerController,
+    sandTrails,
+    camera,
+    setQuality: applyQualityTier,
     applyShot(shot) {
       if (!shot) return;
       if (typeof shot.tod === 'number') {
@@ -206,6 +288,9 @@ function boot() {
       if (shot.weather) {
         worldState.setWeather(shot.weather);
       }
+      if (shot.quality) {
+        applyQualityTier(shot.quality);
+      }
       worldState.update(0);
 
       if (shot.weather === 'coriolisStorm') {
@@ -216,7 +301,7 @@ function boot() {
       }
 
       if (shot.thumper) {
-        worldState.triggerThumper();
+        worldState.triggerThumper(8.5, -14.5, false);
       } else {
         worldState.thumper.active = false;
         worldState.thumper.timer = 0;
@@ -224,7 +309,6 @@ function boot() {
       }
 
       if (shot.breach) {
-        // Position Shai-Hulud at peak awe-inspiring mid-air breach arc during deterministic capture!
         worldState.triggerBreach(12, -106, 0.45);
       } else {
         worldState.worm.phase = 'patrol';
@@ -232,7 +316,6 @@ function boot() {
         worldState.worm.breachTimer = 16;
       }
 
-      // Reset deterministic dust devil showcase coordinates (visible in both 06_spice_blow & 08_hud_overview!)
       worldState.dustDevils[0].x = -35.0;
       worldState.dustDevils[0].z = -72;
       worldState.dustDevils[1].x = -9.5;
@@ -240,16 +323,21 @@ function boot() {
       worldState.dustDevils[2].x = 2.5;
       worldState.dustDevils[2].z = -64;
 
-      cameraController.setPreset(shot.cam || 'director', true);
+      const targetCam = shot.cam || 'director';
+      cameraController.setPreset(targetCam, true);
 
       if (shot.hud !== undefined) {
         hud.setHudVisible(Boolean(shot.hud));
+        hud.setDeckOpen(Boolean(shot.hud) && targetCam !== 'walk');
       }
 
       syncLightingAndFog();
+      envIBL.update(0, true);
+      sandTrails.update(0);
       skySystem?.update?.(0, camera);
       terrainSystem?.update?.(0, camera);
       geologySystem?.update?.(0, camera);
+      landmarksSystem?.update?.(0, camera);
       floraSystem?.update?.(0, camera);
       faunaSystem?.update?.(0, camera);
       atmoFXSystem?.update?.(0, camera);
@@ -277,7 +365,9 @@ function boot() {
         calls: renderer.info.render.calls,
         triangles: renderer.info.render.triangles,
         tod: Number(worldState.timeOfDay.toFixed(2)),
-        weather: worldState.targetWeather
+        weather: worldState.targetWeather,
+        quality: worldState.quality,
+        mode: worldState.cameraMode
       };
     }
   };

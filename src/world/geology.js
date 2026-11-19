@@ -5010,8 +5010,11 @@ export function createGeologyAndProps(scene, worldState) {
     scene.add(group);
   }
 
+  const colliders = rockAnchors.map(a => ({ x: a.x, z: a.z, r: Math.max(1.1, a.r * 0.56) }));
+
   return {
     group,
+    colliders,
     update(dt) {
       const safeDt = Math.min(Math.max(dt || 0, 0), 0.1);
       syncAtmoUniforms(atmoUniforms, worldState);

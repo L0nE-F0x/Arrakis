@@ -88,6 +88,16 @@ function buildPresets() {
       position: new THREE.Vector3(-4.5, safeY(-4.5, -26.0, 9.8), -26.0),
       target: new THREE.Vector3(-22.5, 11.8, -70.0),
       caption: { kicker: 'MÉLANGE VEIN', title: 'Pre-Spice Blow & Swirling Dust Devils' }
+    },
+    camp: {
+      position: new THREE.Vector3(-8.8, safeY(-8.8, 9.6, getGroundHeight(-8.8, 9.6) + 1.85), 9.6),
+      target: new THREE.Vector3(-14.8, getGroundHeight(-14.5, 5.5) + 1.15, 5.2),
+      caption: { kicker: 'FREMEN BIVOUAC', title: 'Yardang Sanctuary Camp & Spice-Oil Brazier' }
+    },
+    ornithopter: {
+      position: new THREE.Vector3(15.2, safeY(15.2, -45.5, getGroundHeight(15.2, -45.5) + 2.8), -45.5),
+      target: new THREE.Vector3(26.0, getGroundHeight(26.0, -56.0) + 1.2, -56.0),
+      caption: { kicker: 'IMPERIAL RELIC', title: 'Downed Ornithopter Half-Claimed by the Erg' }
     }
   };
 }
@@ -157,7 +167,7 @@ function buildDirectorCurves() {
   return { posCurve, tgtCurve };
 }
 
-export function createCameraController(camera, domElement, worldState) {
+export function createCameraController(camera, domElement, worldState, playerController = null) {
   const presets = buildPresets();
   const { posCurve, tgtCurve } = buildDirectorCurves();
 
@@ -194,7 +204,7 @@ export function createCameraController(camera, domElement, worldState) {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (
       e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD' ||
-      e.code === 'KeyQ' || e.code === 'KeyE' ||
+      e.code === 'KeyQ' || e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' ||
       e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight'
     ) {
       keys.add(e.code);
@@ -234,10 +244,23 @@ export function createCameraController(camera, domElement, worldState) {
   }
 
   function setPreset(name, instant = false) {
-    const validName = name === 'director' || name === 'free' || presets[name] ? name : 'director';
+    const validName =
+      name === 'walk' || name === 'director' || name === 'free' || presets[name] ? name : 'director';
     const prevMode = mode;
     mode = validName;
     worldState.cameraMode = validName;
+
+    if (prevMode === 'walk' && validName !== 'walk') {
+      playerController?.exitWalkMode?.();
+    }
+
+    if (validName === 'walk') {
+      controls.enabled = false;
+      transition.active = false;
+      const dropFromHere = prevMode === 'free' && camera.position.y < getGroundHeight(camera.position.x, camera.position.z) + 18.0;
+      playerController?.enterWalkMode?.(dropFromHere);
+      return;
+    }
 
     if (validName === 'director') {
       controls.enabled = false;
@@ -307,6 +330,11 @@ export function createCameraController(camera, domElement, worldState) {
   function update(dt) {
     const step = Math.min(Math.max(dt, 0), 0.1);
 
+    if (mode === 'walk') {
+      playerController?.update?.(step);
+      return;
+    }
+
     if (mode === 'director') {
       if (!worldState.paused) {
         directorElapsed = (directorElapsed + step) % DIRECTOR_DURATION;
@@ -370,7 +398,8 @@ export function createCameraController(camera, domElement, worldState) {
       if (keys.has('KeyQ')) _move.y -= 0.85;
 
       if (_move.lengthSq() > 0) {
-        const speed = 11.5;
+        const boost = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 2.45 : 1.0;
+        const speed = 12.5 * boost;
         _move.normalize().multiplyScalar(speed * step);
         camera.position.add(_move);
         controls.target.add(_move);
@@ -379,9 +408,25 @@ export function createCameraController(camera, domElement, worldState) {
 
     controls.update();
     clampCameraAboveTerrain();
+    // Keep glowglobe animated smoothly if still lit in Free Fly
+    playerController?.update?.(step);
   }
 
   function getCaption() {
+    if (mode === 'walk') {
+      const p = worldState.player;
+      if (p?.onOpenErg) {
+        return {
+          kicker: p.sandwalking ? 'GREAT ERG · SANDWALKING' : 'THE GREAT ERG · OPEN SAND',
+          title: p.sliding ? 'Slipface Avalanche Slide' : p.sandwalking ? 'Walking Without Rhythm' : 'Rhythmic Steps Draw Shai-Hulud'
+        };
+      }
+      if (p?.inWater) {
+        return { kicker: 'SIETCH DEW CISTERN', title: 'Wading the Mirrored Qanat Spring' };
+      }
+      return { kicker: 'FREMEN ON FOOT', title: 'Desert Reconnaissance · WASD · C Sandwalk · T Thumper' };
+    }
+
     if (mode === 'director') {
       if (directorParamT < 0.20 || directorParamT >= 0.88) {
         return { kicker: 'SIETCH DEW BASIN', title: 'First Light Over the Qanat Cistern' };
