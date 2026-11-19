@@ -899,6 +899,82 @@
           "url": "/gauntlet/rounds/carbon-w3-r5/08_hud_overview.png"
         }
       ]
+    },
+    {
+      "round": "swarm-w4-r1",
+      "title": "Round swarm-w4-r1 (wave4)",
+      "timestamp": "2026-11-19T16:16:15.958Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 0.45 ms/frame · Calls: 176 · Tris: 4804843 · Errors: 0",
+      "summary": "Critic #12 FAIL: P0-1 06_spice_crater_trance camera inside downwind spice blow lobes + weak Ibad aura + small crater seam; P0-2 05_electro_optics_worm worm head clipped & foreground flora blocking reticle; P1-4 04_walk_glowglobe_night pennant pole colliding with compass + walk-lock-hint shown; P1-5 moth dots near camp; P1-6 neon-purple spice_wreck crystals.",
+      "images": [
+        {
+          "label": "Yardang Sanctuary Camp & Spice-Oil Brazier (Dusk)",
+          "url": "/gauntlet/rounds/swarm-w4-r1/01_fremen_camp_dusk.png"
+        },
+        {
+          "label": "Downed Imperial Ornithopter in Erg Saltation",
+          "url": "/gauntlet/rounds/swarm-w4-r1/02_downed_ornithopter.png"
+        },
+        {
+          "label": "3D Fremen Sandwalk Footprints & Ripple Relief",
+          "url": "/gauntlet/rounds/swarm-w4-r1/03_sandwalk_footprints.png"
+        },
+        {
+          "label": "Nocturnal Fremen Walk — Suspensor Glowglobe & HUD",
+          "url": "/gauntlet/rounds/swarm-w4-r1/04_walk_glowglobe_night.png"
+        },
+        {
+          "label": "Electro-Optics Binoculars on Breaching Shai-Hulud + Seismograph",
+          "url": "/gauntlet/rounds/swarm-w4-r1/05_electro_optics_worm.png"
+        },
+        {
+          "label": "Pre-Spice Mélange Crater & Eyes-of-Ibad Aura",
+          "url": "/gauntlet/rounds/swarm-w4-r1/06_spice_crater_trance.png"
+        }
+      ]
+    },
+    {
+      "round": "swarm-w3-reg",
+      "title": "Round swarm-w3-reg (wave3)",
+      "timestamp": "2026-11-19T16:16:55.803Z",
+      "verdict": "FAIL",
+      "metrics": "1280x720 · 15.89 ms/frame · Calls: 515 · Tris: 7199109 · Errors: 0",
+      "summary": "Critic #12 FAIL: P0-3 avgFrameMs regressed to 15.89ms (vs <=4.0ms bar) & draw calls doubled to 515-519 (vs 270-276 baseline) due to 6 always-visible PointLights & unmerged lantern/harp/spice meshes; P1-5 giant moth dots in 07_night_moons; P1-6 spice_wreck intrusion in 04_worm_breach.",
+      "images": [
+        {
+          "label": "Opening Shot — Cistern, Mist & Flora (Dawn)",
+          "url": "/gauntlet/rounds/swarm-w3-reg/01_cistern_dawn.png"
+        },
+        {
+          "label": "Macro MuadDib Foraging by Desert Flora",
+          "url": "/gauntlet/rounds/swarm-w3-reg/02_macro_muaddib.png"
+        },
+        {
+          "label": "Tamarisk Canopy & Canopus/Krelln",
+          "url": "/gauntlet/rounds/swarm-w3-reg/03_canopy_sky.png"
+        },
+        {
+          "label": "Shai-Hulud Sandworm Breach Across Erg",
+          "url": "/gauntlet/rounds/swarm-w3-reg/04_worm_breach.png"
+        },
+        {
+          "label": "Coriolis Haboob Storm Wall & Static Flash",
+          "url": "/gauntlet/rounds/swarm-w3-reg/05_coriolis_storm.png"
+        },
+        {
+          "label": "Mélange Spice Blow & Dust Devils",
+          "url": "/gauntlet/rounds/swarm-w3-reg/06_spice_blow.png"
+        },
+        {
+          "label": "Twin-Moon Night & Starlight Reflection",
+          "url": "/gauntlet/rounds/swarm-w3-reg/07_night_moons.png"
+        },
+        {
+          "label": "Interactive HUD + Sunrise Panorama",
+          "url": "/gauntlet/rounds/swarm-w3-reg/08_hud_overview.png"
+        }
+      ]
     }
   ]
 }

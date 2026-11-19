@@ -50,7 +50,7 @@ const SUITES = {
       weather: 'calm',
       cam: 'walk',
       hud: true,
-      walkPose: { x: -9.6, z: 9.2, yaw: 0.56, pitch: -0.05, glowglobe: true, sandwalking: true }
+      walkPose: { x: -11.6, z: 11.6, yaw: 0.12, pitch: -0.06, glowglobe: true, sandwalking: true }
     },
     {
       name: '05_electro_optics_worm',
@@ -61,7 +61,7 @@ const SUITES = {
       hud: true,
       breach: true,
       thumper: true,
-      walkPose: { x: -2.0, z: -24.0, yaw: -0.19, pitch: 0.08, optics: true, opticsZoom: 2.6, sandwalking: true }
+      walkPose: { x: -1.6, z: -30.0, yaw: -0.38, pitch: 0.32, optics: true, opticsZoom: 1.85, sandwalking: true }
     },
     { name: '06_spice_crater_trance', label: 'Pre-Spice Mélange Crater & Eyes-of-Ibad Aura', tod: 16.85, weather: 'spiceBlow', cam: 'spiceCrater', spiceTrance: 0.85 }
   ]

@@ -105,8 +105,8 @@ function buildPresets() {
       caption: { kicker: 'FREMEN SANDWALK', title: 'Displaced Boot Prints & Wind-Swept Slipface' }
     },
     spiceCrater: {
-      position: new THREE.Vector3(-13.2, safeY(-13.2, -60.2, getGroundHeight(-13.2, -60.2) + 1.65), -60.2),
-      target: new THREE.Vector3(-21.0, getGroundHeight(-21.0, -68.0) + 0.35, -68.0),
+      position: new THREE.Vector3(-36.0, safeY(-36.0, -54.0, getGroundHeight(-36.0, -54.0) + 2.4), -54.0),
+      target: new THREE.Vector3(-20.0, getGroundHeight(-21.0, -68.0) + 3.6, -68.0),
       caption: { kicker: 'PRE-SPICE BLOW', title: 'Crystalline Mélange Seams & Cinnamon Plume' }
     }
   };
