@@ -11,6 +11,7 @@ import { createFaunaSystem } from './world/fauna.js';
 import { createAtmosphereFXSystem } from './world/atmosphereFX.js';
 import { createPlayerController } from './world/player.js';
 import { createCameraController } from './world/camera.js';
+import { getGroundHeight } from './world/terrainMath.js';
 import { createPostProcess } from './world/postprocess.js';
 import { createSoundscape } from './audio/soundscape.js';
 import { initHud } from './ui/hud.js';
@@ -323,12 +324,80 @@ function boot() {
       worldState.dustDevils[2].x = 2.5;
       worldState.dustDevils[2].z = -64;
 
-      const targetCam = shot.cam || 'director';
+      const targetCam = shot.walkPose ? 'walk' : (shot.cam || 'director');
+
+      // Reset optional Wave 4 states cleanly by default
+      worldState.player.spiceTrance = shot.spiceTrance ?? 0;
+      if (!shot.footprints) {
+        sandTrails.clearAll?.();
+      }
+      if (targetCam !== 'walk' && !shot.walkPose) {
+        playerController.exitWalkMode?.();
+        worldState.player.glowglobeOn = false;
+        worldState.player.opticsActive = false;
+        worldState.player.opticsZoom = 1.0;
+        camera.fov = 48;
+        camera.updateProjectionMatrix();
+      }
+
+      if (shot.footprints) {
+        if (sandTrails.seedShowcaseTrail) {
+          sandTrails.seedShowcaseTrail(3.4, -30.0, 0.28, 14, true);
+        } else {
+          sandTrails.clearAll?.();
+          sandTrails.origin?.set?.(3.0, -30.0);
+          const steps = 14;
+          for (let i = 0; i < steps; i++) {
+            const t = i / (steps - 1);
+            const fx = 3.4 + (2.4 - 3.4) * t + (i % 2 === 0 ? -0.18 : 0.18);
+            const fz = -27.0 + (-33.5 - -27.0) * t;
+            sandTrails.stampFootprint?.(fx, fz, 0.28, i % 2 === 0, 1.15, true);
+          }
+        }
+      }
+
       cameraController.setPreset(targetCam, true);
 
-      if (shot.hud !== undefined) {
+      if (shot.walkPose) {
+        if (playerController.setPose) {
+          playerController.setPose(shot.walkPose);
+        } else {
+          const pose = shot.walkPose;
+          const p = worldState.player;
+          const gx = pose.x ?? p.feetPosition.x;
+          const gz = pose.z ?? p.feetPosition.z;
+          const gy = getGroundHeight(gx, gz);
+          p.active = true;
+          p.feetPosition.set(gx, gy, gz);
+          p.velocity.set(0, 0, 0);
+          p.yaw = pose.yaw ?? 0;
+          p.pitch = pose.pitch ?? 0;
+          p.crouching = Boolean(pose.crouching);
+          p.sandwalking = Boolean(pose.sandwalking);
+          p.thumperAiming = Boolean(pose.thumperAiming);
+          const wantGlow = Boolean(pose.glowglobe);
+          if (p.glowglobeOn !== wantGlow) {
+            playerController.toggleGlowglobe?.();
+          }
+          p.opticsActive = Boolean(pose.optics);
+          p.opticsZoom = p.opticsActive ? (pose.opticsZoom || 2.6) : 1.0;
+          const eyeY = gy + (p.crouching ? 0.94 : 1.66);
+          p.position.set(gx, eyeY, gz);
+          camera.position.copy(p.position);
+          camera.rotation.order = 'YXZ';
+          camera.rotation.set(p.pitch, p.yaw, 0);
+          camera.fov = 48.0 / p.opticsZoom;
+          camera.updateProjectionMatrix();
+        }
+        if (shot.hud) {
+          hud.setHudVisible(true);
+          hud.setDeckOpen(false);
+        }
+      } else if (shot.hud !== undefined) {
         hud.setHudVisible(Boolean(shot.hud));
         hud.setDeckOpen(Boolean(shot.hud) && targetCam !== 'walk');
+      } else if (isCleanCapture) {
+        hud.setHudVisible(false);
       }
 
       syncLightingAndFog();

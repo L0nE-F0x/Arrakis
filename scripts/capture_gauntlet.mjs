@@ -38,6 +38,32 @@ const SUITES = {
     { name: '06_spice_blow', label: 'Mélange Spice Blow & Dust Devils', tod: 13.4, weather: 'spiceBlow', cam: 'spice' },
     { name: '07_night_moons', label: 'Twin-Moon Night & Starlight Reflection', tod: 23.3, weather: 'calm', cam: 'nightCistern' },
     { name: '08_hud_overview', label: 'Interactive HUD + Sunrise Panorama', tod: 6.45, weather: 'dustDevil', cam: 'director', hud: true }
+  ],
+  wave4: [
+    { name: '01_fremen_camp_dusk', label: 'Yardang Sanctuary Camp & Spice-Oil Brazier (Dusk)', tod: 18.45, weather: 'calm', cam: 'camp' },
+    { name: '02_downed_ornithopter', label: 'Downed Imperial Ornithopter in Erg Saltation', tod: 17.35, weather: 'saltation', cam: 'ornithopter' },
+    { name: '03_sandwalk_footprints', label: '3D Fremen Sandwalk Footprints & Ripple Relief', tod: 17.15, weather: 'calm', cam: 'footprints', footprints: true },
+    {
+      name: '04_walk_glowglobe_night',
+      label: 'Nocturnal Fremen Walk — Suspensor Glowglobe & HUD',
+      tod: 23.25,
+      weather: 'calm',
+      cam: 'walk',
+      hud: true,
+      walkPose: { x: -9.6, z: 9.2, yaw: 0.56, pitch: -0.05, glowglobe: true, sandwalking: true }
+    },
+    {
+      name: '05_electro_optics_worm',
+      label: 'Electro-Optics Binoculars on Breaching Shai-Hulud + Seismograph',
+      tod: 17.4,
+      weather: 'saltation',
+      cam: 'walk',
+      hud: true,
+      breach: true,
+      thumper: true,
+      walkPose: { x: -2.0, z: -24.0, yaw: -0.19, pitch: 0.08, optics: true, opticsZoom: 2.6, sandwalking: true }
+    },
+    { name: '06_spice_crater_trance', label: 'Pre-Spice Mélange Crater & Eyes-of-Ibad Aura', tod: 16.85, weather: 'spiceBlow', cam: 'spiceCrater', spiceTrance: 0.85 }
   ]
 };
 

@@ -98,6 +98,16 @@ function buildPresets() {
       position: new THREE.Vector3(15.2, safeY(15.2, -45.5, getGroundHeight(15.2, -45.5) + 2.8), -45.5),
       target: new THREE.Vector3(26.0, getGroundHeight(26.0, -56.0) + 1.2, -56.0),
       caption: { kicker: 'IMPERIAL RELIC', title: 'Downed Ornithopter Half-Claimed by the Erg' }
+    },
+    footprints: {
+      position: new THREE.Vector3(4.6, safeY(4.6, -26.2, getGroundHeight(4.6, -26.2) + 0.95), -26.2),
+      target: new THREE.Vector3(2.6, getGroundHeight(2.6, -33.0) + 0.25, -33.0),
+      caption: { kicker: 'FREMEN SANDWALK', title: 'Displaced Boot Prints & Wind-Swept Slipface' }
+    },
+    spiceCrater: {
+      position: new THREE.Vector3(-13.2, safeY(-13.2, -60.2, getGroundHeight(-13.2, -60.2) + 1.65), -60.2),
+      target: new THREE.Vector3(-21.0, getGroundHeight(-21.0, -68.0) + 0.35, -68.0),
+      caption: { kicker: 'PRE-SPICE BLOW', title: 'Crystalline Mélange Seams & Cinnamon Plume' }
     }
   };
 }

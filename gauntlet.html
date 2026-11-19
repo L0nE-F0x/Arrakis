@@ -30,11 +30,46 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 16px;
         border-bottom: 1px solid var(--border);
         padding-bottom: 18px;
       }
       h1 { margin: 0; font-family: Georgia, serif; letter-spacing: 0.14em; color: var(--gold); }
       .sub { color: var(--muted); margin: 6px 0 0; font-size: 14px; }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .filter-pills {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .filter-pill {
+        appearance: none;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        padding: 7px 13px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .filter-pill:hover {
+        color: var(--text);
+        border-color: rgba(228, 169, 92, 0.55);
+      }
+      .filter-pill.active {
+        background: rgba(228, 169, 92, 0.18);
+        color: var(--gold);
+        border-color: var(--gold);
+      }
       .back-link {
         color: var(--spice);
         text-decoration: none;
@@ -95,40 +130,80 @@
         <h1>GAUNTLET LOOP // ARRAKIS</h1>
         <p class="sub">Fresh-context visual critic progression &amp; automated WebGL2 telemetry</p>
       </div>
-      <a class="back-link" href="/">← Return to Arrakis</a>
+      <div class="header-actions">
+        <div class="filter-pills" id="wave-filters" role="group" aria-label="Filter rounds by wave">
+          <button class="filter-pill active" type="button" data-wave="all">All</button>
+          <button class="filter-pill" type="button" data-wave="wave1">Wave 1</button>
+          <button class="filter-pill" type="button" data-wave="wave2">Wave 2</button>
+          <button class="filter-pill" type="button" data-wave="wave3">Wave 3</button>
+          <button class="filter-pill" type="button" data-wave="wave4">Wave 4</button>
+        </div>
+        <a class="back-link" href="/">← Return to Arrakis</a>
+      </div>
     </header>
     <main class="rounds" id="rounds"><div class="empty">Loading Gauntlet history…</div></main>
     <script>
+      let activeWave = 'all';
+      let cachedRounds = [];
+
+      function matchesWave(r, wave) {
+        if (wave === 'all') return true;
+        const n = wave.replace('wave', '');
+        const haystack = `${r.round || ''} ${r.title || ''}`.toLowerCase();
+        return haystack.includes(`(${wave})`) || haystack.includes(wave) || new RegExp(`(?:^|[-_])w${n}(?:[-_]|$)`).test(haystack);
+      }
+
+      function renderRounds() {
+        const root = document.getElementById('rounds');
+        if (!cachedRounds.length) {
+          root.innerHTML = '<div class="empty">No Gauntlet rounds recorded yet.</div>';
+          return;
+        }
+        const filtered = cachedRounds.filter(r => matchesWave(r, activeWave)).slice().reverse();
+        if (!filtered.length) {
+          root.innerHTML = `<div class="empty">No rounds found for ${activeWave.replace('wave', 'Wave ')}.</div>`;
+          return;
+        }
+        root.innerHTML = filtered.map(r => `
+          <article class="round-card">
+            <div class="round-head">
+              <div>
+                <div class="round-title">${r.title}</div>
+                <div class="sub">${r.timestamp} · ${r.metrics || ''}</div>
+              </div>
+              <span class="badge ${r.verdict}">${r.verdict}</span>
+            </div>
+            <div class="verdict-notes">${(r.summary || '').replace(/</g, '&lt;')}</div>
+            <div class="thumbs">
+              ${(r.images || []).map(img => `
+                <a class="thumb" href="${img.url}" target="_blank">
+                  <img src="${img.url}" loading="lazy" alt="${img.label}" onerror="this.closest('a').style.display='none'" />
+                  <span>${img.label}</span>
+                </a>
+              `).join('')}
+            </div>
+          </article>
+        `).join('');
+      }
+
+      document.getElementById('wave-filters')?.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-wave]');
+        if (!btn) return;
+        activeWave = btn.dataset.wave || 'all';
+        document.querySelectorAll('#wave-filters .filter-pill').forEach(el => {
+          el.classList.toggle('active', el === btn);
+        });
+        renderRounds();
+      });
+
       async function load() {
         const root = document.getElementById('rounds');
         try {
           const res = await fetch('/gauntlet/history.json?t=' + Date.now());
           if (!res.ok) throw new Error('No history yet');
           const data = await res.json();
-          if (!data.rounds?.length) {
-            root.innerHTML = '<div class="empty">No Gauntlet rounds recorded yet.</div>';
-            return;
-          }
-          root.innerHTML = data.rounds.slice().reverse().map(r => `
-            <article class="round-card">
-              <div class="round-head">
-                <div>
-                  <div class="round-title">${r.title}</div>
-                  <div class="sub">${r.timestamp} · ${r.metrics || ''}</div>
-                </div>
-                <span class="badge ${r.verdict}">${r.verdict}</span>
-              </div>
-              <div class="verdict-notes">${(r.summary || '').replace(/</g, '&lt;')}</div>
-              <div class="thumbs">
-                ${(r.images || []).map(img => `
-                  <a class="thumb" href="${img.url}" target="_blank">
-                    <img src="${img.url}" loading="lazy" alt="${img.label}" onerror="this.closest('a').style.display='none'" />
-                    <span>${img.label}</span>
-                  </a>
-                `).join('')}
-              </div>
-            </article>
-          `).join('');
+          cachedRounds = data.rounds || [];
+          renderRounds();
         } catch (err) {
           root.innerHTML = '<div class="empty">Waiting for Round 1 captures…</div>';
         }
